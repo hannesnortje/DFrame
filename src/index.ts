@@ -1,4 +1,4 @@
-import { QWidget, QLabel, QPushButton, QComboBox, QLineEdit, QTextEdit, QSpacer, QDialog } from './widgets';
+import { QWidget, QLabel, QPushButton, QComboBox, QLineEdit, QTextEdit, QSpacer, QDialog, DialogCode, QMessageBox, StandardButton, Icon } from './widgets';
 import { QVBoxLayout, QHBoxLayout } from './layouts';
 import { QStyle } from './core';
 
@@ -132,6 +132,160 @@ document.addEventListener('DOMContentLoaded', () => {
     const textEdit = new QTextEdit();
     textEdit.setPlaceholderText('Multi-line text editor...');
     mainLayout.addWidget(textEdit);
+    
+    // Add message box showcase section
+    const messageBoxSectionLabel = new QLabel('QMessageBox Showcase:');
+    QStyle.applyStyle(messageBoxSectionLabel.getElement(), {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginTop: 20
+    });
+    mainLayout.addWidget(messageBoxSectionLabel);
+    
+    // Message box types layout
+    const messageBoxLayout = new QHBoxLayout();
+    mainLayout.addLayout(messageBoxLayout);
+    
+    // Information message box button
+    const infoButton = new QPushButton('Information');
+    QStyle.applyStyle(infoButton.getElement(), {
+        padding: '8px 16px',
+        backgroundColor: '#17a2b8',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        marginRight: 10
+    });
+    messageBoxLayout.addWidget(infoButton);
+    
+    // Warning message box button
+    const warningButton = new QPushButton('Warning');
+    QStyle.applyStyle(warningButton.getElement(), {
+        padding: '8px 16px',
+        backgroundColor: '#ffc107',
+        color: 'black',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        marginRight: 10
+    });
+    messageBoxLayout.addWidget(warningButton);
+    
+    // Error message box button
+    const errorButton = new QPushButton('Critical Error');
+    QStyle.applyStyle(errorButton.getElement(), {
+        padding: '8px 16px',
+        backgroundColor: '#dc3545',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        marginRight: 10
+    });
+    messageBoxLayout.addWidget(errorButton);
+    
+    // Question message box button
+    const questionButton = new QPushButton('Question');
+    QStyle.applyStyle(questionButton.getElement(), {
+        padding: '8px 16px',
+        backgroundColor: '#6f42c1',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer'
+    });
+    messageBoxLayout.addWidget(questionButton);
+    
+    // Connect message box buttons to show appropriate message boxes
+    infoButton.connect('clicked', () => {
+        const result = QMessageBox.information(
+            mainWindow,
+            'Information',
+            'This is an information message.',
+            StandardButton.Ok
+        );
+        statusLabel.setText(`Information dialog: ${result === StandardButton.Ok ? 'OK clicked' : 'Cancelled'}`);
+    });
+    
+    warningButton.connect('clicked', () => {
+        const result = QMessageBox.warning(
+            mainWindow,
+            'Warning',
+            'This is a warning message.',
+            StandardButton.Ok | StandardButton.Cancel,
+            StandardButton.Cancel
+        );
+        statusLabel.setText(`Warning dialog: ${result === StandardButton.Ok ? 'OK clicked' : 'Cancelled'}`);
+    });
+    
+    errorButton.connect('clicked', () => {
+        const result = QMessageBox.critical(
+            mainWindow,
+            'Critical Error',
+            'A critical error has occurred.',
+            StandardButton.Abort | StandardButton.Retry | StandardButton.Ignore
+        );
+        
+        let responseText = 'Critical dialog: ';
+        switch (result) {
+            case StandardButton.Abort: responseText += 'Aborted'; break;
+            case StandardButton.Retry: responseText += 'Retry requested'; break;
+            case StandardButton.Ignore: responseText += 'Ignored'; break;
+        }
+        statusLabel.setText(responseText);
+    });
+    
+    questionButton.connect('clicked', () => {
+        const result = QMessageBox.question(
+            mainWindow,
+            'Confirmation',
+            'Do you want to proceed with this action?',
+            StandardButton.Yes | StandardButton.No,
+            StandardButton.No
+        );
+        statusLabel.setText(`Question dialog: ${result === StandardButton.Yes ? 'Yes' : 'No'}`);
+    });
+    
+    // Additional example for custom message box
+    const customMessageBoxButton = new QPushButton('Custom Message Box');
+    QStyle.applyStyle(customMessageBoxButton.getElement(), {
+        padding: '8px 16px',
+        backgroundColor: '#20c997',
+        color: 'white',
+        border: 'none',
+        borderRadius: 4,
+        cursor: 'pointer',
+        marginTop: 10
+    });
+    mainLayout.addWidget(customMessageBoxButton);
+    
+    customMessageBoxButton.connect('clicked', () => {
+        // Create a custom message box with detailed text
+        const msgBox = new QMessageBox(mainWindow);
+        msgBox.setIcon(Icon.Question);
+        msgBox.setText('Custom Message Box Demo');
+        msgBox.setInformativeText('This message box demonstrates more advanced features.');
+        msgBox.setDetailedText(
+            'This is detailed text that can contain extended information.\n\n' +
+            'You can use it to provide:\n' +
+            '- Technical details\n' +
+            '- Error logs\n' +
+            '- Additional context'
+        );
+        msgBox.setStandardButtons(StandardButton.Ok | StandardButton.Help);
+        msgBox.setDefaultButton(StandardButton.Ok);
+        
+        const result = msgBox.exec();
+        if (result === DialogCode.Accepted) {
+            statusLabel.setText('Custom message box: OK clicked');
+        } else {
+            statusLabel.setText('Custom message box: Help clicked');
+        }
+    });
+    
+    // Add vertical spacer before existing dialog showcase section
+    mainLayout.addWidget(QSpacer.createVertical(20));
     
     // Add dialog showcase section
     const dialogSectionLabel = new QLabel('QDialog Showcase:');

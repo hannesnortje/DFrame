@@ -7,3 +7,4 @@ export { QTextEdit } from './QTextEdit';
 export { QSpacer } from './QSpacer';
 export { QCheckBox } from './QCheckBox';
 export { QDialog, DialogCode } from './QDialog';
+export { QMessageBox, StandardButton, Icon } from './QMessageBox';
