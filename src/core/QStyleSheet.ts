@@ -1,4 +1,5 @@
 import { QObject } from './QObject';
+import { QWidget } from '../widgets/QWidget';
 
 export class QStyleSheet extends QObject {
     private _rules: Map<string, Record<string, string>> = new Map();
@@ -38,4 +39,41 @@ export class QStyleSheet extends QObject {
         
         this._styleElement.textContent = css;
     }
+    
+    applyTo(widget: QWidget): void {
+        // Add class names to elements based on their widget type
+        const element = widget.getElement();
+        const widgetClassName = widget.constructor.name;
+        element.classList.add(widgetClassName);
+        
+        // Apply to children recursively
+        widget.getChildren().forEach(child => {
+            if (child instanceof QWidget) {
+                this.applyTo(child);
+            }
+        });
+    }
 }
+
+// Example usage (commented out to avoid runtime errors):
+/*
+// Create a stylesheet for your application
+const styleSheet = new QStyleSheet();
+
+// Add rules similar to CSS
+styleSheet.addRule('.QPushButton', {
+    backgroundColor: '#2196f3',
+    color: 'white',
+    padding: '10px 20px',
+    borderRadius: '4px',
+    border: 'none'
+});
+
+styleSheet.addRule('.QPushButton:hover', {
+    backgroundColor: '#0d8af0',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+});
+
+// Apply the stylesheet to your application
+// styleSheet.applyTo(myApp);
+*/

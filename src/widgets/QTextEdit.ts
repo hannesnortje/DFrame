@@ -1,77 +1,113 @@
 import { QWidget } from './QWidget';
-import { Qt } from '../core/Qt';
+import { QObject } from '../core/QObject';
+import { QStyle } from '../core/QStyle';
 
+/**
+ * A widget that allows editing multi-line text
+ */
 export class QTextEdit extends QWidget {
-    protected textarea: HTMLTextAreaElement;
-    protected _readOnly: boolean = false;
-    protected _acceptRichText: boolean = true;
-    protected _placeholderText: string = '';
-
-    constructor(parent: QWidget | null = null) {
+    private textareaElement: HTMLTextAreaElement;
+    
+    /**
+     * Create a new text edit
+     * @param text Initial text
+     * @param parent Parent widget
+     */
+    constructor(text: string = '', parent: QWidget | null = null) {
         super(parent);
-        this.element = document.createElement('div');
-        this.textarea = document.createElement('textarea');
-        this.element.appendChild(this.textarea);
-        this.textarea.value = '';
-        this.initializeTextEdit();
-    }
-
-    private initializeTextEdit() {
-        this.textarea.addEventListener('input', () => {
-            this.emit('textChanged', void 0);
+        
+        this.textareaElement = document.createElement('textarea');
+        this.textareaElement.value = text;
+        this.textareaElement.className = 'dframe-text-edit';
+        
+        // Style the textarea element
+        QStyle.applyStyle(this.textareaElement, {
+            padding: '8px 10px',
+            border: '1px solid #ced4da',
+            borderRadius: '4px',
+            width: '100%',
+            minHeight: '100px',
+            boxSizing: 'border-box',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            resize: 'vertical'
         });
-        this.textarea.addEventListener('focus', () => {
-            this.emit('focused', void 0);
+        
+        this.getElement().appendChild(this.textareaElement);
+        
+        // Handle input events
+        this.textareaElement.addEventListener('input', () => {
+            this.emit('textChanged', this.textareaElement.value);
         });
-        this.textarea.addEventListener('blur', () => {
-            this.emit('editingFinished', void 0);
+        
+        this.textareaElement.addEventListener('focus', () => {
+            this.emit('focused');
+        });
+        
+        this.textareaElement.addEventListener('blur', () => {
+            this.emit('blurred');
         });
     }
-
-    setPlainText(text: string) {
-        this.textarea.value = text;
-        this.emit('textChanged', undefined);
+    
+    /**
+     * Get the current text
+     */
+    getText(): string {
+        return this.textareaElement.value;
     }
-
-    toPlainText(): string {
-        return this.textarea.value;
+    
+    /**
+     * Set the text
+     * @param text The text to set
+     */
+    setText(text: string): void {
+        this.textareaElement.value = text;
+        this.emit('textChanged', text);
     }
-
-    setHtml(text: string) {
-        if (this._acceptRichText) {
-            this.textarea.innerHTML = text;
-            this.emit('textChanged', void 0);
-        }
+    
+    /**
+     * Append text to the end
+     * @param text The text to append
+     */
+    append(text: string): void {
+        this.textareaElement.value += text;
+        this.emit('textChanged', this.textareaElement.value);
     }
-
-    toHtml(): string {
-        return this._acceptRichText ? this.textarea.innerHTML : this.textarea.value;
+    
+    /**
+     * Set whether the input is read-only
+     * @param readOnly Whether the input is read-only
+     */
+    setReadOnly(readOnly: boolean): void {
+        this.textareaElement.readOnly = readOnly;
     }
-
-    setAcceptRichText(accept: boolean) {
-        this._acceptRichText = accept;
-    }
-
-    setReadOnly(readOnly: boolean) {
-        this._readOnly = readOnly;
-        this.textarea.readOnly = readOnly;
-    }
-
+    
+    /**
+     * Get whether the input is read-only
+     */
     isReadOnly(): boolean {
-        return this._readOnly;
+        return this.textareaElement.readOnly;
     }
-
-    setPlaceholderText(text: string) {
-        this._placeholderText = text;
-        this.textarea.placeholder = text;
+    
+    /**
+     * Select all text
+     */
+    selectAll(): void {
+        this.textareaElement.select();
     }
-
-    clear() {
-        this.setPlainText('');
+    
+    /**
+     * Clear the text
+     */
+    clear(): void {
+        this.textareaElement.value = '';
+        this.emit('textChanged', '');
     }
-
-    append(text: string) {
-        this.textarea.value += text;
-        this.emit('textChanged', void 0);
+    
+    /**
+     * Get the textarea element
+     */
+    getTextareaElement(): HTMLTextAreaElement {
+        return this.textareaElement;
     }
 }

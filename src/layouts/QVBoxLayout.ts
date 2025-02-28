@@ -1,112 +1,195 @@
-import { QLayout, QLayoutItem } from './QLayout';
+import { QLayout } from './QLayout';
 import { QWidget } from '../widgets/QWidget';
+import { QStyle } from '../core/QStyle';
 import { Qt } from '../core/Qt';
 
+interface WidgetOptions {
+    alignment?: number; // Use Qt alignment flags
+    stretch?: number;
+}
+
+interface WidgetEntry {
+    widget: QWidget;
+    options?: WidgetOptions;
+}
+
 export class QVBoxLayout extends QLayout {
-    protected spacing: number = 5;
+    private _widgets: WidgetEntry[] = [];
+    private _spacing: number = 10;
+    private _contentsMargins = { top: 0, right: 0, bottom: 0, left: 0 };
 
     constructor(parent?: QWidget) {
         super(parent);
-        if (this.parent) {
-            this.parent.setStyle({
+        this.initLayout();
+    }
+
+    // Fix the updateLayout method to properly handle element creation and updates
+    private initLayout() {
+        if (this.getParentWidget()) {
+            // Make sure the parent widget's element is properly styled for a vertical layout
+            QStyle.applyStyle(this.getParentWidget()!.getElement(), {
                 display: 'flex',
                 flexDirection: 'column',
-                gap: `${this.spacing}px`,
                 width: '100%',
-                minHeight: '600px',     // Increased from 300px
-                height: 'auto',         // Will adjust to content
-                alignItems: 'center',
-                padding: '20px',
-                overflowY: 'auto'       // Add scrolling if needed
+                height: '100%', // Take up full parent height
+                overflow: 'visible', // Allow content to be visible
+                boxSizing: 'border-box'
             });
         }
     }
 
-    addWidget(widget: QWidget, stretch: number = 0, alignment: number = 0) {
-        if (!this.parent) {
-            console.warn('Layout has no parent widget, creating container');
-            this.parent = new QWidget(null);
-            this.parent.setStyle({
-                display: 'flex',
-                flexDirection: 'column',
-                gap: `${this.spacing}px`,
-                width: '100%',
-                alignItems: 'center'
-            });
+    // Fix the addWidget method to ensure widgets are properly displayed
+    addWidget(widget: QWidget, stretchOrOptions?: number | WidgetOptions, alignment?: number): void {
+        // Handle different parameter options as before...
+        let options: WidgetOptions = {};
+        if (typeof stretchOrOptions === 'object') {
+            options = stretchOrOptions;
+        } else {
+            if (stretchOrOptions !== undefined) {
+                options.stretch = stretchOrOptions;
+            }
+            if (alignment !== undefined) {
+                options.alignment = alignment;
+            }
         }
 
-        const widgetItem: QLayoutItem = { widget, stretch, alignment };
-        this.widgets.push(widgetItem);
-        
-        widget.setStyle({
-            flex: stretch ? `${stretch}` : '0 0 auto',
-            alignSelf: this.getAlignmentStyle(alignment),
-            minHeight: '40px',          // Added minimum height for widgets
-            marginBottom: '10px'        // Added spacing between widgets
-        });
-        
-        this.parent.getElement().appendChild(widget.getElement());
+        this._widgets.push({ widget, options });
+
+        // Add the widget to the DOM - Make sure this part works correctly
+        const parentElement = this.getParentWidget()?.getElement();
+        if (parentElement) {
+            // Create a wrapper for alignment if needed
+            if (options && options.alignment) {
+                const wrapper = document.createElement('div');
+                QStyle.applyStyle(wrapper, {
+                    display: 'flex',
+                    width: '100%',
+                    marginBottom: `${this._spacing}px`,
+                    boxSizing: 'border-box'
+                });
+
+                // Apply alignment styles
+                this.applyAlignment(wrapper, options.alignment);
+                
+                // Make sure the widget element style is properly set for display
+                const widgetElement = widget.getElement();
+                QStyle.applyStyle(widgetElement, {
+                    display: 'block',  // Ensure the widget is displayed
+                    visibility: 'visible'
+                });
+                
+                // Add the widget to the wrapper
+                wrapper.appendChild(widgetElement);
+                parentElement.appendChild(wrapper);
+            } else {
+                // Default behavior - add directly to parent
+                const widgetElement = widget.getElement();
+                QStyle.applyStyle(widgetElement, {
+                    marginBottom: `${this._spacing}px`,
+                    display: 'block',  // Ensure the widget is displayed
+                    visibility: 'visible'
+                });
+                parentElement.appendChild(widgetElement);
+            }
+        }
+
+        this.updateLayout();
     }
 
-    private getAlignmentStyle(alignment: number): string {
-        if (alignment & Qt.Alignment.AlignHCenter) return 'center';
-        if (alignment & Qt.Alignment.AlignRight) return 'flex-end';
-        return 'flex-start';
-    }
+    /**
+     * Apply alignment to a wrapper element based on Qt.AlignmentFlag
+     */
+    private applyAlignment(element: HTMLElement, alignment: number): void {
+        // Horizontal alignment
+        if (alignment & Qt.AlignmentFlag.AlignLeft) {
+            element.style.justifyContent = 'flex-start';
+        } else if (alignment & Qt.AlignmentFlag.AlignHCenter) {
+            element.style.justifyContent = 'center';
+        } else if (alignment & Qt.AlignmentFlag.AlignRight) {
+            element.style.justifyContent = 'flex-end';
+        } else if (alignment & Qt.AlignmentFlag.AlignJustify) {
+            element.style.justifyContent = 'space-between';
+        }
 
-    setSpacing(spacing: number) {
-        this.spacing = spacing;
-        this.update();
-    }
-
-    removeWidget(widget: QWidget) {
-        const index = this.widgets.findIndex(item => item.widget === widget);
-        if (index !== -1) {
-            const item = this.widgets[index];
-            this.widgets.splice(index, 1);
-            this.parent?.getElement().removeChild(item.widget.getElement());
-            this.update();
+        // Vertical alignment
+        if (alignment & Qt.AlignmentFlag.AlignTop) {
+            element.style.alignItems = 'flex-start';
+        } else if (alignment & Qt.AlignmentFlag.AlignVCenter) {
+            element.style.alignItems = 'center';
+        } else if (alignment & Qt.AlignmentFlag.AlignBottom) {
+            element.style.alignItems = 'flex-end';
         }
     }
 
-    clear() {
-        this.widgets.forEach(item => {
-            this.parent?.getElement().removeChild(item.widget.getElement());
-        });
-        this.widgets = [];
-        // Also clear child layouts
-        this.childLayouts = [];
-        this.update();
-    }
-
-    update() {
-        if (!this.parent) return;
-
-        let totalHeight = 0;
-        this.widgets.forEach(item => {
-            const element = item.widget.getElement();
-            element.style.marginBottom = `${this.spacing}px`;
-            totalHeight += (element.offsetHeight || 40) + this.spacing;
-        });
-
-        // Add extra padding at the bottom
-        totalHeight += 40;
-
-        // Update parent to contain all children (with minimum height)
-        const minHeight = 600;
-        this.parent.getElement().style.minHeight = `${Math.max(totalHeight, minHeight)}px`;
-
-        // Update child layouts
-        for (const childLayout of this.childLayouts) {
-            childLayout.update();
-        }
-    }
-
-    minimumSize(): { width: number; height: number } {
+    // Implement required abstract methods from QLayout
+    
+    minimumSize(): { width: number, height: number } {
         return { width: 0, height: 0 };
     }
+    
+    sizeHint(): { width: number, height: number } {
+        return { width: 100, height: 100 };
+    }
+    
+    update(): void {
+        this.updateLayout();
+    }
+    
+    // Method to remove widgets
+    removeWidget(widget: QWidget): void {
+        const index = this._widgets.findIndex(item => item.widget === widget);
+        if (index !== -1) {
+            const widgetToRemove = this._widgets[index].widget;
+            const element = widgetToRemove.getElement();
+            if (element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+            this._widgets.splice(index, 1);
+        }
+    }
+    
+    // Method to clear all widgets
+    clear(): void {
+        if (this.getParentWidget()) {
+            const parentElement = this.getParentWidget()!.getElement();
+            while (parentElement.firstChild) {
+                parentElement.removeChild(parentElement.firstChild);
+            }
+        }
+        this._widgets = [];
+    }
 
-    sizeHint(): { width: number; height: number } {
-        return { width: 100, height: 200 };
+    setSpacing(spacing: number): void {
+        this._spacing = spacing;
+        this.updateLayout();
+    }
+
+    setContentsMargins(left: number, top: number, right: number, bottom: number): void {
+        this._contentsMargins = { left, top, right, bottom };
+        this.updateLayout();
+    }
+
+    // Fix the error in updateLayout method
+
+    private updateLayout(): void {
+        const parentWidget = this.getParentWidget();
+        if (!parentWidget) return;
+
+        // Apply margins only if we have a valid parent widget
+        const element = parentWidget.getElement();
+        if (element) {
+            QStyle.applyStyle(element, {
+                padding: `${this._contentsMargins.top}px ${this._contentsMargins.right}px ${this._contentsMargins.bottom}px ${this._contentsMargins.left}px`
+            });
+        }
+    }
+
+    // Override the spacing getter to maintain compatibility
+    getSpacing(): number {
+        return this._spacing;
+    }
+
+    contentsMargins(): { left: number, top: number, right: number, bottom: number } {
+        return { ...this._contentsMargins };
     }
 }

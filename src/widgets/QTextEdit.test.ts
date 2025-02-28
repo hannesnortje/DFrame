@@ -2,45 +2,55 @@ import { QTextEdit } from './QTextEdit';
 
 describe('QTextEdit', () => {
     let textEdit: QTextEdit;
-
+    
     beforeEach(() => {
         textEdit = new QTextEdit();
-        // Instead of mocking the textarea, spy on the actual methods
-        jest.spyOn(textEdit, 'toPlainText').mockImplementation(() => {
-            // Return what was set in setPlainText
-            return textEdit['_plainText'] || '';
-        });
+        document.body.appendChild(textEdit.getElement());
+    });
+    
+    afterEach(() => {
+        textEdit.getElement().remove();
+    });
+    
+    it('should set and get text correctly', () => {
+        const testText = 'Hello World';
         
-        // Add a storage property for testing
-        textEdit['_plainText'] = '';
+        textEdit.setText(testText);
         
-        // Make sure setPlainText stores the value to retrieve
-        const originalSetPlainText = textEdit.setPlainText;
-        jest.spyOn(textEdit, 'setPlainText').mockImplementation((text: string) => {
-            textEdit['_plainText'] = text;
-            return originalSetPlainText.call(textEdit, text);
-        });
+        expect(textEdit.getText()).toBe(testText);
     });
-
-    test('should set and get plain text', () => {
-        textEdit.setPlainText('test text');
-        expect(textEdit.toPlainText()).toBe('test text');
+    
+    it('should emit textChanged event when text changes', () => {
+        const textChangedSpy = jest.fn();
+        const testText = 'Hello World';
+        
+        // Fix: make sure the callback accepts any arguments
+        textEdit.connect('textChanged', textChangedSpy);
+        
+        textEdit.setText(testText);
+        
+        expect(textChangedSpy).toHaveBeenCalledWith(testText);
     });
-
-    test('should set and get HTML', () => {
-        textEdit.setHtml('<p>test</p>');
-        expect(textEdit.toHtml()).toContain('test');
+    
+    it('should append text correctly', () => {
+        textEdit.setText('Hello');
+        textEdit.append(' World');
+        
+        expect(textEdit.getText()).toBe('Hello World');
     });
-
-    test('should handle read-only state', () => {
+    
+    it('should clear text correctly', () => {
+        textEdit.setText('Hello World');
+        textEdit.clear();
+        
+        expect(textEdit.getText()).toBe('');
+    });
+    
+    it('should set read-only state correctly', () => {
         textEdit.setReadOnly(true);
         expect(textEdit.isReadOnly()).toBe(true);
-    });
-
-    test('should emit textChanged signal', () => {
-        const changeHandler = jest.fn();
-        textEdit.connect('textChanged', changeHandler);
-        textEdit.setPlainText('new text');
-        expect(changeHandler).toHaveBeenCalled();
+        
+        textEdit.setReadOnly(false);
+        expect(textEdit.isReadOnly()).toBe(false);
     });
 });

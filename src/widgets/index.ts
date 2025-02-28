@@ -4,7 +4,3 @@ export { QPushButton } from './QPushButton';
 export { QComboBox } from './QComboBox';
 export { QLineEdit } from './QLineEdit';
 export { QTextEdit } from './QTextEdit';
-export { QSpacer } from './QSpacer';
-export { QCheckBox } from './QCheckBox';
-export { QDialog, DialogCode } from './QDialog';
-export { QMessageBox, StandardButton, Icon } from './QMessageBox';

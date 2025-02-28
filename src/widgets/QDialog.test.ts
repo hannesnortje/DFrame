@@ -1,4 +1,14 @@
 import { QDialog, DialogCode } from './QDialog';
+import { QDebug } from '../core/QDebug';
+
+// Mock QDebug.applyToWidget to prevent errors during testing
+jest.mock('../core/QDebug', () => ({
+    QDebug: {
+        applyToWidget: jest.fn(),
+        isEnabled: () => false,
+    }
+}));
+
 import { QStyle } from '../core/QStyle';
 
 describe('QDialog', () => {

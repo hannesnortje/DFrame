@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "jest", "@playwright/test"],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/tests-e2e",
+    "src/test"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

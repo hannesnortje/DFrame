@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFrame App</title>
+    <style>
+        html, body, #root {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        /* Force the root element to display properly */
+        #root {
+            display: block;
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script src="bundle.js"></script>
+    <script>
+        // Expose DFrame for testing purposes
+        window.DFrame = window.DFrame || {
+            // Core components
+            QObject: DFrame.QObject,
+            QStyle: DFrame.QStyle,
+            Qt: DFrame.Qt,
+            
+            // Widgets
+            QWidget: DFrame.QWidget,
+            QLabel: DFrame.QLabel,
+            QPushButton: DFrame.QPushButton,
+            QTextEdit: DFrame.QTextEdit,
+            QLineEdit: DFrame.QLineEdit,
+            QComboBox: DFrame.QComboBox,
+            QSpacer: DFrame.QSpacer,
+            QTabWidget: DFrame.QTabWidget,
+            
+            // Layouts
+            QVBoxLayout: DFrame.QVBoxLayout,
+            QHBoxLayout: DFrame.QHBoxLayout,
+            
+            // Dialogs
+            QDialog: DFrame.QDialog,
+            QMessageBox: DFrame.QMessageBox
+        };
+    </script>
+</body>
+</html>

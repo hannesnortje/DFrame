@@ -1,25 +1,13 @@
-// Global test setup for Jest
+// Setup file for Jest
 
-// Mock any browser APIs that JSDOM doesn't support
-if (typeof window !== 'undefined') {
-  // Add any missing browser APIs here
-  if (!window.MouseEvent) {
-    window.MouseEvent = class MockMouseEvent {
-      constructor(type, options = {}) {
-        this.type = type;
-        this.bubbles = options.bubbles || false;
-        this.cancelable = options.cancelable || false;
-      }
-    };
-  }
-  
-  // Mock HTMLElement methods that might not be in JSDOM
-  if (typeof HTMLElement !== 'undefined') {
-    HTMLElement.prototype.scrollIntoView = HTMLElement.prototype.scrollIntoView || function() {};
-  }
-}
+// Configure the test environment
+console.log('DFrame Test Environment Setup');
 
-// Add global jest mocks
+// Note about DOM limitations
+console.log('NOTE: Some visual layout tests may be skipped in JSDOM');
+console.log('For full layout testing, use browser-based tests with Playwright or Cypress');
+
+// Mock browser APIs that aren't fully implemented in JSDOM
 global.ResizeObserver = class ResizeObserver {
   observe() {}
   unobserve() {}

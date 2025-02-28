@@ -1,133 +1,98 @@
 import { QWidget } from './QWidget';
+import { QObject } from '../core/QObject';
 import { QStyle } from '../core/QStyle';
 
+/**
+ * A combo box widget that shows a list of selectable items
+ */
 export class QComboBox extends QWidget {
-    protected select: HTMLSelectElement;
-    protected _currentIndex: number = -1;
-    protected _editable: boolean = false;
-    protected _maxVisibleItems: number = 10;
-    protected _insertPolicy: QComboBox.InsertPolicy = QComboBox.InsertPolicy.InsertAtBottom;
-    protected _sizeAdjustPolicy: QComboBox.SizeAdjustPolicy = QComboBox.SizeAdjustPolicy.AdjustToContentsOnFirstShow;
-    protected items: Array<{ text: string, data: any }> = [];
+    private selectElement: HTMLSelectElement;
+    private currentIndex: number = -1;
+    private items: string[] = [];
 
+    /**
+     * Create a new combo box
+     * @param parent The parent widget
+     */
     constructor(parent: QWidget | null = null) {
         super(parent);
-        this.element = document.createElement('div');
-        this.select = document.createElement('select');
-        this.element.appendChild(this.select);
         
-        this.setStyle({
-            margin: '4px',
-            width: 'auto',
-            minWidth: '200px'
+        this.selectElement = document.createElement('select');
+        this.selectElement.className = 'dframe-combo-box';
+        
+        // Style the select element
+        QStyle.applyStyle(this.selectElement, {
+            padding: '5px',
+            borderRadius: '4px',
+            border: '1px solid #ced4da',
+            backgroundColor: '#fff',
+            width: '100%',
+            fontSize: '14px'
         });
-
-        this.select.style.padding = '8px 12px';
-        this.select.style.fontSize = '14px';
-        this.select.style.borderRadius = '4px';
-        this.select.style.border = '1px solid #ced4da';
-        this.select.style.backgroundColor = '#fff';
-        this.select.style.cursor = 'pointer';
-        this.select.style.width = '100%';
-
-        this.select.addEventListener('change', () => {
-            this._currentIndex = this.select.selectedIndex;
-            this.emit('currentIndexChanged', this._currentIndex);
-            this.emit('activated', this._currentIndex);
+        
+        this.getElement().appendChild(this.selectElement);
+        
+        // Handle change event
+        this.selectElement.addEventListener('change', (e) => {
+            this.currentIndex = this.selectElement.selectedIndex;
+            this.emit('currentIndexChanged', this.currentIndex);
+            this.emit('currentTextChanged', this.currentText());
         });
     }
 
-    setProperty(name: string, value: any) {
-        if (name === 'items' && Array.isArray(value)) {
-            value.forEach(item => this.addItem(item));
-            return;
-        }
-        super.setProperty(name, value);
-    }
-
-    addItem(text: string, userData: any = null) {
-        const option = document.createElement('option') as HTMLOptionElement;
-        option.text = text;
-        this.items.push({ text, data: userData });
-        this.select.appendChild(option);
-    }
-
-    insertItem(index: number, text: string, userData: any = null) {
+    /**
+     * Add an item to the combo box
+     * @param text The text for the item
+     */
+    addItem(text: string): void {
         const option = document.createElement('option');
         option.text = text;
-        this.items.splice(index, 0, { text, data: userData });
-        this.select.add(option, index);
+        option.value = String(this.items.length);
+        this.selectElement.appendChild(option);
+        this.items.push(text);
     }
 
-    removeItem(index: number) {
-        this.select.remove(index);
-        this.items.splice(index, 1);
+    /**
+     * Add multiple items to the combo box
+     * @param items Array of item texts to add
+     */
+    addItems(items: string[]): void {
+        items.forEach(item => this.addItem(item));
     }
 
-    setItemText(index: number, text: string) {
-        if (index >= 0 && index < this.select.options.length) {
-            this.select.options[index].text = text;
-            this.items[index].text = text;
+    /**
+     * Get the current selected text
+     */
+    currentText(): string {
+        return this.currentIndex >= 0 ? this.items[this.currentIndex] : '';
+    }
+
+    /**
+     * Set the current index
+     * @param index The index to select
+     */
+    setCurrentIndex(index: number): void {
+        if (index >= -1 && index < this.items.length) {
+            this.currentIndex = index;
+            this.selectElement.selectedIndex = index;
+            this.emit('currentIndexChanged', index);
+            this.emit('currentTextChanged', this.currentText());
         }
     }
 
-    itemText(index: number): string {
-        return this.items[index]?.text ?? '';
+    /**
+     * Get the current index
+     */
+    getCurrentIndex(): number {
+        return this.currentIndex;
     }
 
-    itemData(index: number): any {
-        return this.items[index]?.data ?? null;
-    }
-
-    setEditable(editable: boolean) {
-        this._editable = editable;
-        // Implementation for editable combo box would go here
-    }
-
-    setMaxVisibleItems(maxItems: number) {
-        this._maxVisibleItems = maxItems;
-        this.select.size = Math.min(this.count(), maxItems);
-    }
-
-    count(): number {
-        return this.items.length;
-    }
-
-    currentIndex(): number {
-        return this.select.selectedIndex;
-    }
-
-    setCurrentIndex(index: number) {
-        this.select.selectedIndex = index;
-        this._currentIndex = index;
-        this.emit('currentIndexChanged', index);
-    }
-
-    currentText(): string {
-        return this.select.options[this.currentIndex()]?.text ?? '';
-    }
-
-    clear() {
-        this.select.innerHTML = '';
+    /**
+     * Clear all items
+     */
+    clear(): void {
+        this.selectElement.innerHTML = '';
         this.items = [];
-    }
-}
-
-// Add Qt-like enums for QComboBox
-export namespace QComboBox {
-    export enum InsertPolicy {
-        NoInsert,
-        InsertAtTop,
-        InsertAtCurrent,
-        InsertAtBottom,
-        InsertAfterCurrent,
-        InsertBeforeCurrent,
-        InsertAlphabetically
-    }
-
-    export enum SizeAdjustPolicy {
-        AdjustToContents,
-        AdjustToContentsOnFirstShow,
-        AdjustToMinimumContentsLength
+        this.currentIndex = -1;
     }
 }

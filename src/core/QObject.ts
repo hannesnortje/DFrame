@@ -3,23 +3,36 @@ import { Qt } from './Qt';
 export type Signal<T = void> = (payload: T) => void;
 export type Slot<T = void> = (payload: T) => void;
 
+/**
+ * Base class for all DFrame objects
+ */
 export class QObject {
-    private signals: Map<string, Set<Slot<any>>> = new Map();
-    protected parent: QObject | null = null;
-    private children: Set<QObject> = new Set();
+    private events: Map<string, ((...args: unknown[]) => void)[]> = new Map();
     private _objectName: string = '';
     private destroyed: boolean = false;
+    protected parent: QObject | null = null;
+    private children: Set<QObject> = new Set();
 
+    /**
+     * Create a new QObject
+     */
     constructor(parent: QObject | null = null) {
         if (parent) {
             this.setParent(parent);
         }
     }
 
-    setObjectName(name: string) {
+    /**
+     * Set the object name
+     * @param name Name to set
+     */
+    setObjectName(name: string): void {
         this._objectName = name;
     }
 
+    /**
+     * Get the object name
+     */
     objectName(): string {
         return this._objectName;
     }
@@ -38,27 +51,57 @@ export class QObject {
         this.emit('destroyed', this);
         this.children.forEach(child => child.destroy());
         this.setParent(null);
-        this.signals.clear();
+        this.events.clear();
         this.destroyed = true;
     }
 
-    connect<T>(signal: string, slot: Slot<T>, connectionType = Qt.ConnectionType.AutoConnection) {
-        if (this.destroyed) return;
-        if (!this.signals.has(signal)) {
-            this.signals.set(signal, new Set());
-        }
-        this.signals.get(signal)!.add(slot);
+    /**
+     * Emit an event with optional arguments
+     * @param eventName The name of the event to emit
+     * @param args Arguments to pass to the event handlers
+     */
+    emit(eventName: string, ...args: unknown[]): void {
+        const handlers = this.events.get(eventName) || [];
+        handlers.forEach(handler => handler(...args));
     }
 
-    disconnect<T>(signal: string, slot: Slot<T>) {
-        if (this.signals.has(signal)) {
-            this.signals.get(signal)!.delete(slot);
+    /**
+     * Connect to an event
+     * @param eventName The name of the event to connect to
+     * @param handler The function to call when the event is emitted
+     */
+    connect(eventName: string, handler: (...args: unknown[]) => void): void {
+        if (!this.events.has(eventName)) {
+            this.events.set(eventName, []);
         }
+        
+        this.events.get(eventName)!.push(handler);
     }
 
-    emit<T>(signal: string, payload: T) {
-        if (this.signals.has(signal)) {
-            this.signals.get(signal)!.forEach(slot => slot(payload));
+    /**
+     * Disconnect from an event
+     * @param eventName The name of the event to disconnect from
+     * @param handler The handler to disconnect, or undefined to disconnect all handlers
+     */
+    disconnect(eventName: string, handler?: (...args: unknown[]) => void): void {
+        if (!this.events.has(eventName)) {
+            return;
+        }
+        
+        if (!handler) {
+            this.events.delete(eventName);
+            return;
+        }
+        
+        const handlers = this.events.get(eventName)!;
+        const index = handlers.indexOf(handler);
+        
+        if (index !== -1) {
+            handlers.splice(index, 1);
+        }
+        
+        if (handlers.length === 0) {
+            this.events.delete(eventName);
         }
     }
 

@@ -1,5 +1,6 @@
 import { QObject } from '../core/QObject';
 import { Qt, QSizePolicy } from '../core/Qt';
+import { QDebug } from '../core/QDebug';
 
 export class QWidget extends QObject {
     [key: string]: any;  // Add index signature for dynamic property access
@@ -16,20 +17,27 @@ export class QWidget extends QObject {
         super(parent);
         this.element = document.createElement('div');
         this.element.style.position = 'relative';
-        this.element.style.overflow = 'hidden';
         this.element.style.boxSizing = 'border-box';
         this.element.style.width = '100%';
-        this.element.style.minHeight = '50px';  // Good default minimum height
-        this.element.style.height = 'auto';     // Allow height to grow with content
-        this.element.style.display = 'flex';
-        this.element.style.flexDirection = 'column';
+        this.element.style.minHeight = '50px';
+        this.element.style.height = 'auto';
+        this.element.style.display = 'block';  // Default to block display
+        this.element.style.visibility = 'visible';  // Explicitly make it visible
         this._sizePolicy = Qt.SizePolicy.create(Qt.SizePolicy.Fixed, Qt.SizePolicy.Fixed);
         this.setFocusPolicy(Qt.FocusPolicy.NoFocus);
+        
+        // Add debug attributes
+        QDebug.applyToWidget(this);
     }
 
     setVisible(visible: boolean) {
         this._visible = visible;
-        this.element.style.display = visible ? 'block' : 'none';
+        if (visible) {
+            this.element.style.display = 'block';
+            this.element.style.visibility = 'visible';
+        } else {
+            this.element.style.display = 'none';
+        }
     }
 
     isVisible(): boolean {
@@ -142,7 +150,41 @@ export class QWidget extends QObject {
         console.log(`Widget ${id} has element:`, this.getElement());
     }
 
+    setObjectName(name: string) {
+        super.setObjectName(name);
+        this.element.setAttribute('data-dframe-object-name', name);
+        return this;
+    }
+
     protected updateGeometry() {
         // Implement size policy behavior
+    }
+
+    /**
+     * Protected method for cleanup in derived classes
+     */
+    protected cleanup(): void {
+        // Base implementation does nothing
+    }
+
+    /**
+     * Emit an event with optional parameters
+     */
+    emit(eventName: string, ...args: unknown[]): void {
+        const event = new CustomEvent(eventName, { detail: args });
+        this.element.dispatchEvent(event);
+    }
+    
+    /**
+     * Connect to an event with a callback
+     */
+    connect(eventName: string, callback: (...args: unknown[]) => any): void {
+        this.element.addEventListener(eventName, (event: Event) => {
+            if (event instanceof CustomEvent) {
+                callback(...(event.detail || []));
+            } else {
+                callback(event);
+            }
+        });
     }
 }

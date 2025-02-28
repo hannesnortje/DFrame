@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFrame Test Page</title>
+    <style>
+        html, body, #root {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        #root {
+            display: block;
+            background-color: white;
+        }
+    </style>
+    <!-- Load the test mocks before anything else -->
+    <script src="test-setup.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <div id="test-status">DFrame test page loaded</div>
+    
+    <script>
+        // Make sure DFrame is available globally
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DFrame object:', window.DFrame);
+            if (typeof window.DFrame !== 'undefined') {
+                console.log('DFrame found - Classes available:');
+                Object.keys(window.DFrame).forEach(key => {
+                    console.log(`  - ${key}`);
+                });
+            } else {
+                console.error('DFrame not found in global scope');
+            }
+        });
+    </script>
+</body>
+</html>

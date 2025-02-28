@@ -1,4 +1,13 @@
 import { QWidget } from './QWidget';
+import { QDebug } from '../core/QDebug';
+
+// Mock QDebug.applyToWidget to prevent errors during testing
+jest.mock('../core/QDebug', () => ({
+    QDebug: {
+        applyToWidget: jest.fn(),
+        isEnabled: () => false,
+    }
+}));
 
 describe('QWidget', () => {
     let widget: QWidget;

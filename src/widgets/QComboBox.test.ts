@@ -1,39 +1,69 @@
 import { QComboBox } from './QComboBox';
 
 describe('QComboBox', () => {
-    let combo: QComboBox;
-
+    let comboBox: QComboBox;
+    
     beforeEach(() => {
-        combo = new QComboBox();
+        comboBox = new QComboBox();
+        document.body.appendChild(comboBox.getElement());
     });
-
-    test('should add and remove items', () => {
-        combo.addItem('Item 1');
-        combo.addItem('Item 2');
-        expect(combo.count()).toBe(2);
-        combo.removeItem(0);
-        expect(combo.count()).toBe(1);
+    
+    afterEach(() => {
+        comboBox.getElement().remove();
     });
-
-    test('should set and get current index', () => {
-        combo.addItem('Item 1');
-        combo.addItem('Item 2');
-        combo.setCurrentIndex(1);
-        expect(combo.currentIndex()).toBe(1);
+    
+    it('should add items correctly', () => {
+        comboBox.addItem('Option 1');
+        comboBox.addItem('Option 2');
+        
+        // Check select element has options
+        const selectElement = comboBox.getElement().querySelector('select');
+        expect(selectElement?.children.length).toBe(2);
     });
-
-    test('should handle item text and data', () => {
-        combo.addItem('Item 1', { id: 1 });
-        expect(combo.itemText(0)).toBe('Item 1');
-        expect(combo.itemData(0)).toEqual({ id: 1 });
+    
+    it('should set current index correctly', () => {
+        comboBox.addItem('Option 1');
+        comboBox.addItem('Option 2');
+        
+        comboBox.setCurrentIndex(1);
+        
+        // Use the getter instead of accessing private property
+        expect(comboBox.getCurrentIndex()).toBe(1);
     });
-
-    test('should emit currentIndexChanged signal', () => {
-        const changeHandler = jest.fn();
-        combo.connect('currentIndexChanged', changeHandler);
-        combo.addItem('Item 1');
-        combo.addItem('Item 2');
-        combo.setCurrentIndex(1);
-        expect(changeHandler).toHaveBeenCalledWith(1);
+    
+    it('should return correct current text', () => {
+        comboBox.addItem('Option 1');
+        comboBox.addItem('Option 2');
+        
+        comboBox.setCurrentIndex(1);
+        
+        expect(comboBox.currentText()).toBe('Option 2');
+    });
+    
+    it('should emit events when selection changes', () => {
+        const indexChangedSpy = jest.fn();
+        const textChangedSpy = jest.fn();
+        
+        comboBox.addItem('Option 1');
+        comboBox.addItem('Option 2');
+        
+        comboBox.connect('currentIndexChanged', indexChangedSpy);
+        comboBox.connect('currentTextChanged', textChangedSpy);
+        
+        comboBox.setCurrentIndex(1);
+        
+        expect(indexChangedSpy).toHaveBeenCalledWith(1);
+        expect(textChangedSpy).toHaveBeenCalledWith('Option 2');
+    });
+    
+    it('should clear all items', () => {
+        comboBox.addItem('Option 1');
+        comboBox.addItem('Option 2');
+        
+        comboBox.clear();
+        
+        const selectElement = comboBox.getElement().querySelector('select');
+        expect(selectElement?.children.length).toBe(0);
+        expect(comboBox.getCurrentIndex()).toBe(-1);
     });
 });

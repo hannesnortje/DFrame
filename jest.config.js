@@ -27,5 +27,10 @@ module.exports = {
         'coverage'
     ],
     // Disable notifications to avoid the dependency requirement
-    notify: false
+    notify: false,
+
+    // Add snapshot serializer for layout testing
+    snapshotSerializers: [
+        '<rootDir>/src/test/widget-snapshot-serializer.js'
+    ]
 };
