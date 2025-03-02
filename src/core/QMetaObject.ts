@@ -1,4 +1,5 @@
 import { QObject, Property } from './QObject';
+import { QProperty } from './QProperty';
 
 /**
  * Represents a method in a QMetaObject.
@@ -12,7 +13,7 @@ export interface QMetaMethod {
 }
 
 /**
- * Represents a property in a QMetaObject.
+ * Enhanced property metadata
  */
 export interface QMetaProperty {
     name: string;
@@ -27,6 +28,26 @@ export interface QMetaProperty {
     constant: boolean;
     final: boolean;
     notify: string | null; // Signal name
+
+    /** Default value if available */
+    defaultValue?: any;
+
+    /** Property type metadata */
+    typeMetadata?: {
+        isEnum: boolean;
+        enumValues?: Record<string, number>;
+        isArray: boolean;
+        isObject: boolean;
+        isBuiltin: boolean;
+    };
+
+    /** Flags for property behavior */
+    flags?: {
+        isBindable: boolean;
+        isObservable: boolean;
+        isStatic: boolean;
+        isRequired: boolean;
+    };
 }
 
 /**
@@ -80,12 +101,12 @@ export class QMetaObject {
     /**
      * Returns a new instance of the class this meta object describes.
      */
-    newInstance(parent: QObject | null = null): QObject | null {
+    newInstance(...args: any[]): QObject | null {
         try {
             // Get constructor from global scope
             const constructor = (window as any)[this.className];
             if (typeof constructor === 'function') {
-                return new constructor(parent);
+                return new constructor(...args);
             }
         } catch (e) {
             console.error(`Failed to create instance of ${this.className}:`, e);
@@ -263,5 +284,52 @@ export class QMetaObject {
         }
         
         return null;
+    }
+
+    /**
+     * Gets all QProperties (enhanced property system) from an object
+     */
+    getPropertyObjects(obj: QObject): Record<string, QProperty<any>> {
+        const result: Record<string, QProperty<any>> = {};
+        
+        // Get registered QProperties
+        if (obj['_qproperties'] && obj['_qproperties'] instanceof Map) {
+            for (const [key, prop] of obj['_qproperties']) {
+                result[key] = prop;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Creates a proxy object that automatically updates when source object changes
+     */
+    createObservableProxy(obj: QObject): QObject {
+        const meta = this;
+        
+        // Create a proxy to intercept property access
+        return new Proxy(obj, {
+            get(target, prop, receiver) {
+                const value = Reflect.get(target, prop, receiver);
+                
+                // If property is a function, bind it to the original object
+                if (typeof value === 'function') {
+                    return value.bind(target);
+                }
+                
+                return value;
+            },
+            set(target, prop, value, receiver) {
+                if (typeof prop === 'string') {
+                    const metaProp = meta.getProperty(prop);
+                    if (metaProp?.writable) {
+                        return target.setProperty(prop, value);
+                    }
+                }
+                
+                return Reflect.set(target, prop, value, receiver);
+            }
+        });
     }
 }
