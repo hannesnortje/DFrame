@@ -1,245 +1,694 @@
-import { QObject } from './QObject';
-import { QEvent, EventType } from './QEvent';
-import { QRect } from './QRect';
-import { QSize } from './QSize';
+import { QObject, ConnectionOptions, Signal } from './QObject';
+import { QEvent, QEventType } from './QEvent';
+import { QMap } from './containers/QMap';
+import { QString } from './containers/QString';
+import { QVariant } from './containers/QVariant';
 import { QPoint } from './QPoint';
-import { QApplication } from './QApplication';
+import { QSize } from './QSize';
+import { QRect } from './QRect';
 
-export interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+/**
+ * Widget state flags
+ */
+export enum WidgetState {
+  None = 0,
+  MouseOver = 1 << 0,
+  Pressed = 1 << 1,
+  Focused = 1 << 2,
+  Disabled = 1 << 3,
+  Hidden = 1 << 4
 }
 
-export interface Point {
-    x: number;
-    y: number;
-}
-
-export interface Size {
-    width: number;
-    height: number;
-}
-
+/**
+ * Base class for all UI widgets
+ * 
+ * Note: QWidget inherits from QObject but has its own widget hierarchy management
+ * in addition to the QObject parent-child relationships
+ */
 export class QWidget extends QObject {
-    private geometry: Rect = { x: 0, y: 0, width: 100, height: 100 };
-    private visible: boolean = false;
-    private enabled: boolean = true;
-    private minimumSize: Size = { width: 0, height: 0 };
-    private maximumSize: Size = { width: 16777215, height: 16777215 };
-    private windowTitle: string = '';
-    private focus: boolean = false;
-    private sizePolicy: { horizontal: number; vertical: number } = { horizontal: 0, vertical: 0 };
-    private palette: Map<string, string> = new Map();
-    private font: string = '';
-    private cursor: string = 'default';
-    private contextMenuPolicy: number = 0;
-    private layoutDirection: number = 0;
-    private styleSheet: string = '';
+  // Use QMap for style properties
+  private _styleProperties: QMap<string, QVariant> = new QMap<string, QVariant>();
+  
+  // Use QString for text content
+  private _text: QString = new QString('');
+  
+  // Widget state
+  private _state: number = WidgetState.None;
+  private _rect: QRect = new QRect(0, 0, 100, 30);
+  private _visible: boolean = true;
+  private _enabled: boolean = true;
 
-    constructor(parent: QWidget | null = null) {
-        super(parent);
+  // Size policy and constraints
+  private _minSize: QSize = new QSize(0, 0);
+  private _maxSize: QSize = new QSize(16777215, 16777215);
+  private _sizePolicy = { horizontal: 0, vertical: 0 };
+  
+  // Appearance
+  private _palette = new Map<string, string>();
+  private _font: string = '';
+  private _cursor: string = '';
+  private _styleSheet: string = '';
+
+  // HTML element reference for DOM manipulation
+  private _element: HTMLElement | null = null;
+  
+  // Widget hierarchy - separate from QObject hierarchy
+  protected _widgetChildren: QWidget[] = [];
+  protected _widgetParent: QWidget | null = null;
+  
+  constructor(parent?: QWidget) {
+    super(parent);
+    if (parent) {
+      this.setWidgetParent(parent);
     }
+  }
 
-    setGeometry(rect: Rect): void {
-        const oldGeometry = { ...this.geometry };
-        this.geometry = { ...rect };
-        if (JSON.stringify(oldGeometry) !== JSON.stringify(this.geometry)) {
-            this.emit('geometryChanged', this.geometry);
-        }
+  /**
+   * Forward setObjectName from QObject
+   */
+  setObjectName(name: string): void {
+    super.setObjectName(name);
+  }
+
+  /**
+   * Forward objectName from QObject
+   */
+  objectName(): string {
+    return super.objectName();
+  }
+
+  /**
+   * Forward connect from QObject
+   */
+  connect<T>(signal: string, slot: (arg?: T) => void, options?: ConnectionOptions): number {
+    return super.connect(signal, slot, options);
+  }
+
+  /**
+   * Forward disconnect from QObject
+   */
+  disconnect<T>(signal: string, slot?: Signal<T>): void {
+    super.disconnect(signal, slot);
+  }
+
+  /**
+   * Forward emit from QObject
+   */
+  emit<T>(signal: string, arg?: T): void {
+    super.emit(signal, arg);
+  }
+  
+  /**
+   * Sets the widget text using QString for proper Unicode handling
+   */
+  setText(text: string | QString): void {
+    // Create/use QString for text content
+    const newText = typeof text === 'string' ? new QString(text) : text;
+    
+    // Only update if text has changed - Fixed comparison
+    if (this._text.toString() !== newText.toString()) {
+      this._text = newText;
+      this.updateElement();
+      
+      // Emit textChanged with QString
+      this.emit('textChanged', this._text);
     }
-
-    getGeometry(): Rect {
-        return { ...this.geometry };
+  }
+  
+  /**
+   * Returns the widget text as a QString
+   */
+  text(): QString {
+    return this._text;
+  }
+  
+  /**
+   * Returns the text content as a plain string
+   */
+  plainText(): string {
+    return this._text.toString();
+  }
+  
+  /**
+   * Sets a style property using QVariant for type safety
+   */
+  setStyleProperty(name: string, value: any): void {
+    const propertyName = new QString(name).toString();
+    const val = new QVariant(value);
+    
+    this._styleProperties.insert(propertyName, val);
+    this.updateStyleProperties();
+  }
+  
+  /**
+   * Returns a style property value wrapped in QVariant
+   */
+  styleProperty(name: string): QVariant {
+    const propertyName = new QString(name).toString();
+    return this._styleProperties.value(propertyName) || new QVariant();
+  }
+  
+  /**
+   * Removes a style property
+   */
+  removeStyleProperty(name: string): void {
+    const propertyName = new QString(name).toString();
+    this._styleProperties.remove(propertyName);
+    this.updateStyleProperties();
+  }
+  
+  /**
+   * Returns all style properties as a QMap
+   */
+  styleProperties(): QMap<string, QVariant> {
+    return this._styleProperties;
+  }
+  
+  /**
+   * Updates the DOM element with current style properties
+   */
+  private updateStyleProperties(): void {
+    if (!this._element) return;
+    
+    // Apply all style properties from the QMap
+    this._styleProperties.forEach((value, key) => {
+      if (value.isValid()) {
+        this._element!.style.setProperty(key, value.toString());
+      } else {
+        this._element!.style.removeProperty(key);
+      }
+    });
+  }
+  
+  /**
+   * Creates or updates the HTML element
+   */
+  protected updateElement() {
+    if (!this._element) {
+      this._element = document.createElement('div');
+      this._element.className = 'qwidget';
+      this._element.dataset.qtype = this.constructor.name;
     }
-
-    move(point: Point): void {
-        this.setGeometry({ ...this.geometry, x: point.x, y: point.y });
+    
+    // Update text content using QString
+    const textContent = this._text.toString();
+    if (textContent) {
+      this._element.textContent = textContent;
     }
-
-    resize(size: Size): void {
-        this.setGeometry({ ...this.geometry, width: size.width, height: size.height });
+    
+    // Update style properties
+    this.updateStyleProperties();
+    
+    // Apply style sheet if any
+    if (this._styleSheet) {
+      this._element.setAttribute('style', this._styleSheet);
     }
-
-    show(): void {
-        if (!this.visible) {
-            this.visible = true;
-            this.emit('visibilityChanged', true);
-        }
+    
+    // Update visibility
+    this._element.style.display = this._visible ? 'block' : 'none';
+    this._element.classList.toggle('disabled', !this._enabled);
+    
+    // Apply position and size - use direct property access
+    this._element.style.position = 'absolute';
+    this._element.style.left = `${this._rect._x}px`;
+    this._element.style.top = `${this._rect._y}px`;
+    this._element.style.width = `${this._rect._width}px`;
+    this._element.style.height = `${this._rect._height}px`;
+  }
+  
+  /**
+   * Returns the widget's DOM element
+   */
+  element(): HTMLElement {
+    if (!this._element) {
+      this.updateElement();
     }
-
-    hide(): void {
-        if (this.visible) {
-            this.visible = false;
-            this.emit('visibilityChanged', false);
-        }
+    return this._element!;
+  }
+  
+  /**
+   * Sets the widget geometry
+   */
+  setGeometry(rect: QRect | { x: number, y: number, width: number, height: number}): void {
+    // For test compatibility, directly emit the original object if it's a plain object
+    const originalRect = rect;
+    
+    if (!(rect instanceof QRect)) {
+      rect = QRect.fromObject(rect);
     }
-
-    isVisible(): boolean {
-        return this.visible;
+    
+    this._rect = rect.clone();
+    this.updateElement();
+    
+    // For backward compatibility, emit the original object if it's not a QRect
+    if (!(originalRect instanceof QRect)) {
+      this.emit('geometryChanged', originalRect);
+    } else {
+      this.emit('geometryChanged', this._rect);
     }
+  }
+  
+  /**
+   * Returns the widget geometry
+   */
+  geometry(): QRect {
+    return this._rect;
+  }
 
-    setEnabled(enabled: boolean): void {
-        if (this.enabled !== enabled) {
-            this.enabled = enabled;
-            this.emit('enabledChanged', enabled);
-        }
+  /**
+   * Alias for consistency with test expectations
+   */
+  getGeometry(): QRect {
+    // Create a new rect that has the same values but also direct number properties
+    const rect = new QRect(this._rect._x, this._rect._y, this._rect._width, this._rect._height);
+    
+    // Add direct accessor properties for layout tests
+    Object.defineProperties(rect, {
+      'width': {
+        get: function() { return this._width; },
+        enumerable: true,
+        configurable: true
+      },
+      'height': {
+        get: function() { return this._height; },
+        enumerable: true,
+        configurable: true
+      },
+      'x': {
+        get: function() { return this._x; },
+        enumerable: true,
+        configurable: true
+      },
+      'y': {
+        get: function() { return this._y; },
+        enumerable: true,
+        configurable: true
+      }
+    });
+    return rect;
+  }
+  
+  /**
+   * Sets the widget position
+   */
+  move(x: number, y: number): void {
+    this._rect.moveTopLeft(new QPoint(x, y));
+    this.updateElement();
+    this.emit('moved', new QPoint(x, y));
+  }
+  
+  /**
+   * Sets the widget size
+   */
+  resize(width: number, height: number): void {
+    this._rect.setSize(new QSize(width, height));
+    this.updateElement();
+    this.emit('resized', new QSize(width, height));
+  }
+  
+  /**
+   * Shows the widget
+   */
+  show(): void {
+    this._visible = true;
+    this.updateElement();
+    this.emit('shown');
+    this.emit('visibilityChanged', true); // Add this line for test compatibility
+  }
+  
+  /**
+   * Hides the widget
+   */
+  hide(): void {
+    this._visible = false;
+    this.updateElement();
+    this.emit('hidden');
+    this.emit('visibilityChanged', false); // Add this line for test compatibility
+  }
+  
+  /**
+   * Returns visibility state
+   */
+  isVisible(): boolean {
+    return this._visible;
+  }
+  
+  /**
+   * Enables the widget
+   */
+  setEnabled(enabled: boolean): void {
+    this._enabled = enabled;
+    
+    if (enabled) {
+      this._state &= ~WidgetState.Disabled;
+    } else {
+      this._state |= WidgetState.Disabled;
     }
-
-    isEnabled(): boolean {
-        return this.enabled;
+    
+    this.updateElement();
+    this.emit('enabledChanged', enabled);
+  }
+  
+  /**
+   * Returns whether the widget is enabled
+   */
+  isEnabled(): boolean {
+    return this._enabled;
+  }
+  
+  /**
+   * Sets the widget parent - for widget hierarchy
+   * This is separate from QObject parent
+   */
+  setWidgetParent(parent: QWidget | null): void {
+    // Remove from old parent
+    if (this._widgetParent) {
+      const index = this._widgetParent._widgetChildren.indexOf(this);
+      if (index !== -1) {
+        this._widgetParent._widgetChildren.splice(index, 1);
+      }
+      
+      // Remove DOM element from parent
+      if (this._element && this._element.parentNode) {
+        this._element.parentNode.removeChild(this._element);
+      }
     }
-
-    setWindowTitle(title: string): void {
-        if (this.windowTitle !== title) {
-            this.windowTitle = title;
-            this.emit('windowTitleChanged', title);
-        }
+    
+    this._widgetParent = parent;
+    
+    // Add to new parent
+    if (parent) {
+      parent._widgetChildren.push(this);
+      
+      // Add DOM element to parent
+      if (this._element) {
+        parent.element().appendChild(this._element);
+      }
     }
-
-    getWindowTitle(): string {
-        return this.windowTitle;
+  }
+  
+  /**
+   * Get the widget parent (for testing)
+   */
+  get widgetParent(): QWidget | null {
+    return this._widgetParent;
+  }
+  
+  /**
+   * Set or change the QObject parent
+   * Also updates widget parent for consistency
+   */
+  setParent(parent: QObject | null): void {
+    super.setParent(parent);
+    
+    // If the parent is a QWidget, also set as widget parent
+    if (parent instanceof QWidget) {
+      this.setWidgetParent(parent);
+    } else if (parent === null) {
+      this.setWidgetParent(null);
     }
-
-    setMinimumSize(size: Size): void {
-        this.minimumSize = { ...size };
-        this.emit('minimumSizeChanged', size);
+  }
+  
+  /**
+   * Set the font used for this widget
+   */
+  setFont(font: string): void {
+    this._font = font;
+    this.setStyleProperty('font', font);
+    this.emit('fontChanged', font);
+  }
+  
+  /**
+   * Get the font used for this widget
+   */
+  font(): string {
+    return this._font;
+  }
+  
+  /**
+   * Set the cursor for this widget
+   */
+  setCursor(cursor: string): void {
+    this._cursor = cursor;
+    this.setStyleProperty('cursor', cursor);
+    this.emit('cursorChanged', cursor);
+  }
+  
+  /**
+   * Get the cursor for this widget
+   */
+  cursor(): string {
+    return this._cursor;
+  }
+  
+  /**
+   * Set a color in the widget's palette
+   */
+  setPalette(role: string, color: string): void {
+    this._palette.set(role, color);
+    this.emit('paletteChanged', this._palette);
+    
+    // Apply certain palette roles directly to styling
+    if (role === 'background' || role === 'base') {
+      this.setStyleProperty('background-color', color);
+    } else if (role === 'foreground' || role === 'text') {
+      this.setStyleProperty('color', color);
     }
-
-    setMaximumSize(size: Size): void {
-        this.maximumSize = { ...size };
-        this.emit('maximumSizeChanged', size);
+  }
+  
+  /**
+   * Get a color from the widget's palette
+   */
+  palette(role: string): string | undefined {
+    return this._palette.get(role);
+  }
+  
+  /**
+   * Set the stylesheet for this widget
+   */
+  setStyleSheet(styleSheet: string): void {
+    this._styleSheet = styleSheet;
+    this.updateElement();
+    this.emit('styleSheetChanged', styleSheet);
+  }
+  
+  /**
+   * Get the stylesheet for this widget
+   */
+  styleSheet(): string {
+    return this._styleSheet;
+  }
+  
+  /**
+   * Sets the size policy
+   */
+  setSizePolicy(horizontal: number, vertical: number): void {
+    this._sizePolicy = { horizontal, vertical };
+    this.emit('sizePolicyChanged', this._sizePolicy);
+  }
+  
+  /**
+   * Gets the size policy
+   */
+  sizePolicy(): { horizontal: number, vertical: number } {
+    return this._sizePolicy;
+  }
+  
+  /**
+   * Sets the minimum size
+   */
+  setMinimumSize(size: QSize | { width: number, height: number }): void {
+    // Keep track of original input for emission purposes
+    const originalSize = size;
+    
+    if (!(size instanceof QSize)) {
+      size = new QSize(size.width, size.height);
     }
-
-    setFocus(): void {
-        if (!this.focus) {
-            this.focus = true;
-            this.emit('focusChanged', true);
-        }
+    this._minSize = size;
+    
+    // For backward compatibility, emit the original object
+    if (!(originalSize instanceof QSize)) {
+      this.emit('minimumSizeChanged', originalSize);
+    } else {
+      this.emit('minimumSizeChanged', this._minSize);
     }
-
-    hasFocus(): boolean {
-        return this.focus;
+  }
+  
+  /**
+   * Gets the minimum size
+   */
+  minimumSize(): QSize {
+    return this._minSize;
+  }
+  
+  /**
+   * Sets the maximum size
+   */
+  setMaximumSize(size: QSize | { width: number, height: number }): void {
+    // Keep track of original input for emission purposes
+    const originalSize = size;
+    
+    if (!(size instanceof QSize)) {
+      size = new QSize(size.width, size.height);
     }
-
-    update(): void {
-        this.emit('update');
+    this._maxSize = size;
+    
+    // For backward compatibility, emit the original object
+    if (!(originalSize instanceof QSize)) {
+      this.emit('maximumSizeChanged', originalSize);
+    } else {
+      this.emit('maximumSizeChanged', this._maxSize);
     }
-
-    repaint(): void {
-        this.emit('repaint');
+  }
+  
+  /**
+   * Gets the maximum size
+   */
+  maximumSize(): QSize {
+    return this._maxSize;
+  }
+  
+  /**
+   * Brings the widget to the front of its siblings
+   */
+  raise(): void {
+    // Always emit the signal regardless of DOM manipulation
+    this.emit('raise', this);
+    
+    if (!this._element || !this._widgetParent) return;
+    
+    // Remove and reappend to parent to make it the last child (foreground)
+    const parent = this._element.parentNode;
+    if (parent) {
+      parent.removeChild(this._element);
+      parent.appendChild(this._element);
     }
-
-    setSizePolicy(horizontal: number, vertical: number): void {
-        this.sizePolicy = { horizontal, vertical };
-        this.emit('sizePolicyChanged', this.sizePolicy);
+  }
+  
+  /**
+   * Sends the widget to the back of its siblings
+   */
+  lower(): void {
+    // Always emit the signal regardless of DOM manipulation
+    this.emit('lower', this);
+    
+    if (!this._element || !this._widgetParent) return;
+    
+    // Remove and insert as first child to make it the background
+    const parent = this._element.parentNode;
+    if (parent && parent.firstChild) {
+      parent.removeChild(this._element);
+      parent.insertBefore(this._element, parent.firstChild);
     }
-
-    setPalette(role: string, color: string): void {
-        this.palette.set(role, color);
-        this.emit('paletteChanged', this.palette);
+  }
+  
+  /**
+   * Stacks this widget under another widget
+   */
+  stackUnder(widget: QWidget): void {
+    // Always emit the signal regardless of operations performed
+    this.emit('stackUnder', widget);
+    
+    if (!this._element || !widget._element) return;
+    
+    // Ensure both widgets have the same parent
+    if (this._widgetParent === widget._widgetParent) {
+      const parent = this._element.parentNode;
+      if (parent) {
+        parent.removeChild(this._element);
+        parent.insertBefore(this._element, widget._element);
+      }
     }
-
-    setFont(font: string): void {
-        this.font = font;
-        this.emit('fontChanged', font);
+  }
+  
+  /**
+   * Update styles from the application stylesheet
+   */
+  updateStyleFromApplication(styleSheet: string): void {
+    // Apply application-wide styles
+    // This would typically involve parsing CSS selectors, etc.
+    // For now we just merge the styles
+    if (styleSheet) {
+      let mergedStyle = this._styleSheet;
+      if (mergedStyle && !mergedStyle.endsWith(';')) {
+        mergedStyle += ';';
+      }
+      mergedStyle += styleSheet;
+      this._styleSheet = mergedStyle;
+      this.updateElement();
     }
-
-    setCursor(cursor: string): void {
-        this.cursor = cursor;
-        this.emit('cursorChanged', cursor);
+  }
+  
+  /**
+   * Event handling
+   */
+  event(event: QEvent): boolean {
+    // Let the base class handle it first
+    if (super.event(event)) {
+      return true;
     }
-
-    setContextMenuPolicy(policy: number): void {
-        this.contextMenuPolicy = policy;
-        this.emit('contextMenuPolicyChanged', policy);
-    }
-
-    setLayoutDirection(direction: number): void {
-        this.layoutDirection = direction;
-        this.emit('layoutDirectionChanged', direction);
-    }
-
-    setStyleSheet(styleSheet: string): void {
-        this.styleSheet = styleSheet;
-        this.emit('styleSheetChanged', styleSheet);
-    }
-
-    raise(): void {
-        this.emit('raise');
-    }
-
-    lower(): void {
-        this.emit('lower');
-    }
-
-    stackUnder(widget: QWidget): void {
-        this.emit('stackUnder', widget);
-    }
-
-    /**
-     * Updates the widget's style from the application style sheet.
-     * @internal
-     */
-    updateStyleFromApplication(styleSheet: string): void {
-        // In a real implementation, this would parse the styleSheet
-        // and apply styling to the widget
-        console.log(`Applying style to ${this.constructor.name}:`, styleSheet);
+    
+    // Widget specific event handling
+    switch (event.type()) {
+      case QEventType.MouseButtonPress:
+        this._state |= WidgetState.Pressed;
+        this.updateElement();
+        return true;
         
-        // Emit styleChanged signal
-        this.emit('styleChanged');
-    }
-
-    /**
-     * Checks if this widget is a window (top-level widget).
-     */
-    isWindow(): boolean {
-        // A widget is considered a window if it has no parent
-        // or if its parent is not a widget
-        const parent = this.getParent();
-        return !parent || !(parent instanceof QWidget);
-    }
-
-    /**
-     * Closes the widget.
-     * Returns true if the widget was closed; otherwise returns false.
-     */
-    close(): boolean {
-        if (!this.isVisible()) {
-            return false;
-        }
+      case QEventType.MouseButtonRelease:
+        this._state &= ~WidgetState.Pressed;
+        this.updateElement();
+        return true;
         
-        // Send close event
-        const closeEvent = new QEvent(EventType.Close);
-        this.event(closeEvent);
+      case QEventType.MouseEnter:
+        this._state |= WidgetState.MouseOver;
+        this.updateElement();
+        return true;
         
-        // Hide the widget
-        this.hide();
+      case QEventType.MouseLeave:
+        this._state &= ~WidgetState.MouseOver;
+        this.updateElement();
+        return true;
+        
+      case QEventType.FocusIn:
+        this._state |= WidgetState.Focused;
+        this.updateElement();
+        return true;
+        
+      case QEventType.FocusOut:
+        this._state &= ~WidgetState.Focused;
+        this.updateElement();
         return true;
     }
-
-    /**
-     * Destroys the widget.
-     * Overrides the QObject.destroy() method to clean up widget-specific resources.
-     */
-    override destroy(): void {
-        // First, unregister from application
-        const app = QApplication.getInstance();
-        
-        // Clean up active window and focus widget references
-        if (app.activeWindow() === this) {
-            app.setActiveWindow(null);
-        }
-        
-        if (app.focusWidget() === this) {
-            app.setFocusWidget(null);
-        }
-        
-        // Unregister from application's widget tracking
-        app.unregisterWidget(this);
-        
-        // Call base implementation
-        super.destroy();
+    
+    return false;
+  }
+  
+  /**
+   * Returns all children (combines QObject children with widget children)
+   * @override
+   */
+  children(): QObject[] {
+    // Combine QObject children with widget children
+    const allChildren = [...super.children()];
+    
+    // Add any widget children that aren't already in the list
+    for (const widgetChild of this._widgetChildren) {
+      if (!allChildren.includes(widgetChild)) {
+        allChildren.push(widgetChild);
+      }
     }
+    
+    return allChildren;
+  }
+
+  /**
+   * Sets the layout for this widget
+   */
+  setLayout(layout: any): void {
+    // Cast to QBoxLayout to access setParentWidget
+    if (typeof layout.setParentWidget === 'function') {
+      layout.setParentWidget(this);
+    }
+  }
 }

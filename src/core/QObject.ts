@@ -1,5 +1,8 @@
 import { QEvent } from './QEvent';
 import { QProperty } from './QProperty';
+import { QMap } from './containers/QMap';
+import { QVariant } from './containers/QVariant';
+import { QString } from './containers/QString';
 
 export type Signal<T = void> = (arg: T) => void;
 export type Property = string | number | boolean | object | undefined | null;
@@ -20,19 +23,19 @@ export interface ConnectionOptions {
 
 export class QObject {
   // Private properties
-  private _parent: QObject | null;
-  private _children: QObject[] = [];
-  private _objectName: string = '';
-  private _blockSignals: boolean = false;
-  private _properties: Map<string, Property> = new Map();
-  private _signals: Map<string, Set<{ 
+  protected _parent: QObject | null;
+  protected _children: QObject[] = [];
+  protected _objectName: string = '';
+  protected _blockSignals: boolean = false;
+  protected _properties: QMap<string, QVariant<any>> = new QMap<string, QVariant<any>>();
+  protected _signals: Map<string, Set<{ 
     callback: Function; 
     options: ConnectionOptions;
     id: number;
   }>> = new Map();
-  private _childrenByName: Map<string, QObject[]> = new Map();
-  private _relationships: Map<string, Set<QObject>> = new Map();
-  private _qproperties: Map<string, QProperty<any>> = new Map();
+  protected _childrenByName: Map<string, QObject[]> = new Map();
+  protected _relationships: Map<string, Set<QObject>> = new Map();
+  protected _qproperties: QMap<string, QProperty<any>> = new QMap<string, QProperty<any>>();
   
   // Static properties
   private static _nextConnectionId = 1;
@@ -48,33 +51,15 @@ export class QObject {
    * Sets the object name
    */
   setObjectName(name: string): void {
-    if (this._objectName === name) return;
+    // Use QString for consistent string handling
+    const qName = new QString(name);
     
-    // Update parent's name index if this object is in a parent
-    if (this._parent) {
-      // Remove from old name index
-      if (this._objectName) {
-        const oldNamedChildren = this._parent._childrenByName.get(this._objectName);
-        if (oldNamedChildren) {
-          const oldNameIndex = oldNamedChildren.indexOf(this);
-          if (oldNameIndex > -1) {
-            oldNamedChildren.splice(oldNameIndex, 1);
-            if (oldNamedChildren.length === 0) {
-              this._parent._childrenByName.delete(this._objectName);
-            }
-          }
-        }
-      }
-      
-      // Add to new name index
-      if (!this._parent._childrenByName.has(name)) {
-        this._parent._childrenByName.set(name, []);
-      }
-      this._parent._childrenByName.get(name)!.push(this);
+    if (this._objectName === qName.toString()) {
+      return;
     }
     
-    this._objectName = name;
-    this.emit('objectNameChanged', name);
+    this._objectName = qName.toString();
+    this.emit('objectNameChanged', this._objectName);
   }
 
   /**
@@ -171,39 +156,54 @@ export class QObject {
   }
 
   /**
-   * Sets a property value
+   * Sets a dynamic property
    */
-  setProperty<T>(name: string, value: T): boolean {
-    // Check if we have a QProperty registered
-    const prop = this._qproperties.get(name);
-    if (prop) {
-      const oldValue = prop.value;
-      prop.value = value;
-      return oldValue !== value;
+  setProperty(name: string, value: any): boolean {
+    // Use the appropriate container classes
+    const propName = new QString(name).toString();
+    
+    // Wrap value in a QVariant for type safety
+    const variant = new QVariant(value);
+    
+    // Check if the property already exists and has the same value
+    if (this._properties.contains(propName)) {
+      const existingProp = this._properties.value(propName);
+      if (existingProp && JSON.stringify(existingProp.value()) === JSON.stringify(variant.value())) {
+        return false; // Value unchanged, return false
+      }
     }
     
-    // Fall back to the standard property map
-    const oldValue = this._properties.get(name);
-    if (oldValue !== value) {
-      this._properties.set(name, value as Property);
-      this.emit('propertyChanged', { name, value });
-      return true;
-    }
-    return false;
+    // Store using QMap for more consistent behavior
+    this._properties.insert(propName, variant);
+    
+    // Emit the propertyChanged signal
+    this.emit('propertyChanged', { 
+      name: propName, 
+      value: variant.value()
+    });
+    
+    return true;
   }
 
   /**
-   * Gets a property value
+   * Returns a property value
    */
-  property<T>(name: string): T | undefined {
-    // Check if we have a QProperty registered
-    const prop = this._qproperties.get(name);
-    if (prop) {
-      return prop.value;
+  property(name: string, defaultValue: any = undefined): any {
+    // Use QString for normalization
+    const propName = new QString(name).toString();
+    
+    // Check for QProperty first
+    if (this._qproperties.contains(propName)) {
+      return this._qproperties.value(propName)?.value;
     }
     
-    // Fall back to the standard property map
-    return this._properties.get(name) as T | undefined;
+    // Check for dynamic property stored in QMap
+    if (this._properties.contains(propName)) {
+      const prop = this._properties.value(propName);
+      return prop ? prop.value() : defaultValue;
+    }
+    
+    return defaultValue;
   }
 
   /**
@@ -279,6 +279,27 @@ export class QObject {
     const allHandlers = Array.from(handlers);
     const singleShotHandlers = new Set<number>();
     
+    // For special signals like 'destroyed', handling circular references differently
+    const hasCircularReferences = isObject && (
+      signal === 'destroyed' || 
+      signal === 'relationshipAdded' || 
+      signal === 'relationshipRemoved'
+    );
+    
+    // Safely serialize objects to detect if they contain circular references
+    let serializedArg: string | undefined;
+    if (isObject && !hasCircularReferences) {
+      try {
+        // Try to serialize but catch circular reference errors
+        serializedArg = JSON.stringify(arg);
+      } catch (e) {
+        // If we have a circular reference, we'll handle it specially
+        if (!(e instanceof TypeError && e.toString().includes('circular'))) {
+          throw e; // Only handle circular reference errors
+        }
+      }
+    }
+    
     // Handle different connection types
     for (const handler of allHandlers) {
       const { callback, options, id } = handler;
@@ -306,15 +327,17 @@ export class QObject {
           break;
           
         case 'blocking':
-          // Call synchronously with copy of data for objects
-          if (isObject) {
-            const copy = JSON.parse(JSON.stringify(arg));
+          // Call synchronously with copy of data for objects, except for circular references
+          if (isObject && serializedArg !== undefined && !hasCircularReferences) {
+            // Only try to make a deep copy if we successfully serialized
+            const copy = JSON.parse(serializedArg);
             if (options.context) {
               callback.call(options.context, copy);
             } else {
               callback(copy);
             }
           } else {
+            // Otherwise use original (can't deep copy)
             if (options.context) {
               callback.call(options.context, arg);
             } else {
@@ -325,8 +348,8 @@ export class QObject {
           
         case 'auto':
         default:
-          // Smart selection - use direct for primitives, queued for large objects
-          if (isObject && JSON.stringify(arg).length > 1000) {
+          // Smart selection, but handle circular references differently
+          if (isObject && serializedArg !== undefined && !hasCircularReferences && serializedArg.length > 1000) {
             // Queue for large objects
             setTimeout(() => {
               if (options.context) {
@@ -336,7 +359,7 @@ export class QObject {
               }
             }, 0);
           } else {
-            // Direct for primitives and small objects
+            // Direct for primitives, small objects, or circular references
             if (options.context) {
               callback.call(options.context, arg);
             } else {
@@ -409,7 +432,8 @@ export class QObject {
    */
   removeEventFilter(filter: QObject): void {
     if (this.property('eventFilter') === filter) {
-      this._properties.delete('eventFilter');  // Use delete instead of setting to null
+      // Use remove instead of delete for QMap
+      this._properties.remove('eventFilter');
     }
   }
 
@@ -440,18 +464,34 @@ export class QObject {
   }
 
   /**
-   * Post an event
+   * Post an event to the object's event queue
    */
-  protected postEvent(event: QEvent): void {
-    // For now, handle events immediately. Later we'll add an event queue.
-    this.event(event);
+  protected postEvent(event: QEvent): void;
+  protected postEvent(receiver: QObject, event: QEvent): void;
+  protected postEvent(arg1: QObject | QEvent, arg2?: QEvent): void {
+    if (arg1 instanceof QEvent) {
+      // Single arg version - post to self
+      this.event(arg1);
+    } else if (arg1 instanceof QObject && arg2) {
+      // Two arg version - post to another object
+      arg1.event(arg2);
+    }
   }
 
   /**
    * Send an event synchronously
    */
-  protected sendEvent(event: QEvent): boolean {
-    return this.event(event);
+  protected sendEvent(event: QEvent): boolean;
+  protected sendEvent(receiver: QObject, event: QEvent): boolean;
+  protected sendEvent(arg1: QObject | QEvent, arg2?: QEvent): boolean {
+    if (arg1 instanceof QEvent) {
+      // Single arg version - send to self
+      return this.event(arg1);
+    } else if (arg1 instanceof QObject && arg2) {
+      // Two arg version - send to another object
+      return arg1.event(arg2);
+    }
+    return false;
   }
 
   /**
@@ -467,13 +507,13 @@ export class QObject {
    * Destroy the object
    */
   destroy(): void {
-    // Save a copy of the object state before destruction
+    // Save state for the destroyed signal with all properties expected by tests
     const finalState = {
-      blockSignals: true,
-      children: new Set(this._children),
       objectName: this._objectName,
       parent: this._parent,
-      properties: new Map(this._properties),
+      blockSignals: true,
+      children: new Set(this._children),
+      properties: new Map(this._properties.toMap()),
       signals: new Map(this._signals)
     };
 
@@ -504,7 +544,7 @@ export class QObject {
     console.log(`Class: ${this.constructor.name}`);
     console.log(`Parent: ${this._parent?.getObjectName() || 'none'}`);
     console.log(`Children: ${this._children.map(c => c.getObjectName()).join(', ')}`);
-    console.log('Properties:', Object.fromEntries(this._properties));
+    console.log('Properties:', Object.fromEntries(this._properties.toMap()));
     console.log('Signals:', Array.from(this._signals.keys()));
   }
 
@@ -512,13 +552,68 @@ export class QObject {
    * @internal Register a property with this object
    */
   _registerProperty<T>(name: string, property: QProperty<T>): void {
-    this._qproperties.set(name, property);
+    // Use QString for normalization
+    const propName = new QString(name).toString();
+    this._qproperties.insert(propName, property);
   }
 
   /**
    * Get a registered QProperty by name
    */
   propertyObject<T>(name: string): QProperty<T> | undefined {
-    return this._qproperties.get(name);
+    // Use QString for normalization
+    const propName = new QString(name).toString();
+    return this._qproperties.value(propName) as QProperty<T> | undefined;
+  }
+
+  /**
+   * Returns the children of this object
+   */
+  children(): QObject[] {
+    return [...this._children]; // Return a copy to prevent direct manipulation
+  }
+
+  /**
+   * Returns the child at the specified index
+   */
+  childAt(index: number): QObject | null {
+    return index >= 0 && index < this._children.length ? this._children[index] : null;
+  }
+
+  /**
+   * Sets a dynamic property
+   */
+  setDynamicProperty(name: string, value: any): boolean {
+    this._qproperties.insert(name, value);
+    this.emit(`${name}Changed`, value);
+    return true;
+  }
+
+  /**
+   * Gets a dynamic property
+   */
+  dynamicProperty(name: string): any {
+    return this._qproperties.value(name);
+  }
+
+  /**
+   * Returns whether signals are blocked
+   */
+  signalsBlocked(): boolean {
+    return this._blockSignals;
+  }
+
+  /**
+   * Returns the parent of this object
+   */
+  parent(): QObject | null {
+    return this._parent;
+  }
+
+  /**
+   * Returns the object name
+   */
+  objectName(): string {
+    return this._objectName;
   }
 }
