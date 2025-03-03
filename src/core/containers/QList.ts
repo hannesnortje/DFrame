@@ -1,3 +1,5 @@
+import { QDebug } from '../QDebug';
+
 /**
  * QList is a template container class that provides a dynamic array.
  */
@@ -230,5 +232,25 @@ export class QList<T> {
      */
     [Symbol.iterator](): Iterator<T> {
         return this._items[Symbol.iterator]();
+    }
+    
+    /**
+     * Outputs the list to the given QDebug instance
+     */
+    debugOutput(debug: QDebug): QDebug {
+        debug.nospace().print('QList(');
+        
+        if (this.isEmpty()) {
+            return debug.print(')');
+        }
+        
+        for (let i = 0; i < this.size(); i++) {
+            if (i > 0) {
+                debug.print(', ');
+            }
+            debug.print(this.at(i));
+        }
+        
+        return debug.print(')');
     }
 }

@@ -1,6 +1,8 @@
 /**
  * Represents a size with width and height dimensions
  */
+import { QDebug } from './QDebug';
+
 export class QSize {
   // Make properties accessible
   public _width: number;
@@ -189,3 +191,15 @@ export enum AspectRatioMode {
   KeepAspectRatio,
   KeepAspectRatioByExpanding
 }
+
+// Add debugOutput method to QSize
+export interface QSize {
+  debugOutput(debug: QDebug): QDebug;
+}
+
+QSize.prototype.debugOutput = function(debug: QDebug): QDebug {
+  return debug.nospace()
+    .print('QSize(')
+    .print(this._width).print('x')
+    .print(this._height).print(')');
+};

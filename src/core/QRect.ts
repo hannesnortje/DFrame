@@ -1,5 +1,6 @@
 import { QPoint } from './QPoint';
 import { QSize } from './QSize';
+import { QDebug } from './QDebug';
 
 /**
  * A class representing a rectangle
@@ -246,3 +247,17 @@ export class QRect {
     return new QRect(obj.x, obj.y, obj.width, obj.height);
   }
 }
+
+// Add debugOutput method to QRect
+export interface QRect {
+  debugOutput(debug: QDebug): QDebug;
+}
+
+QRect.prototype.debugOutput = function(debug: QDebug): QDebug {
+  return debug.nospace()
+    .print('QRect(')
+    .print(this._x).print(',')
+    .print(this._y).print(',')
+    .print(this._width).print('x')
+    .print(this._height).print(')');
+};

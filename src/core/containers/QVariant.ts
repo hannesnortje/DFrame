@@ -1,3 +1,5 @@
+import { QDebug } from '../QDebug';
+
 /**
  * Type identifier for variant types
  */
@@ -23,8 +25,9 @@ export enum QVariantType {
  * QVariant acts like a union for the most common Qt data types.
  */
 export class QVariant<T = any> {
-    private _value: T | null;
-    private _type: QVariantType;
+    // Change from private to protected to allow access from debugOutput
+    protected _value: T | null;
+    protected _type: QVariantType;
     
     /**
      * Creates a new QVariant
@@ -234,5 +237,20 @@ export class QVariant<T = any> {
      */
     static fromNull(): QVariant<null> {
         return new QVariant<null>(null);
+    }
+
+    /**
+     * Debug output
+     */
+    debugOutput(debug: QDebug): QDebug {
+      if (!this.isValid()) {
+        return debug.print('QVariant(invalid)');
+      }
+      
+      return debug.print('QVariant(')
+        .print(this.typeName())
+        .print(', ')
+        .print(this.value())
+        .print(')');
     }
 }

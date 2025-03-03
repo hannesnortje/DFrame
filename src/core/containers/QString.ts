@@ -1,3 +1,5 @@
+import { QDebug } from '../QDebug';
+
 /**
  * QString provides an abstraction of Unicode strings with implicit sharing.
  * It offers similar functionality to JavaScript's String with additional Qt-like methods.
@@ -215,3 +217,12 @@ export class QString {
         return new QString(mapped.join(sep));
     }
 }
+
+// Add debugOutput method to QString
+export interface QString {
+  debugOutput(debug: QDebug): QDebug;
+}
+
+QString.prototype.debugOutput = function(debug: QDebug): QDebug {
+  return debug.print(`"${this.toString()}"`);
+};

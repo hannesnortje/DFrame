@@ -1,3 +1,5 @@
+import { QDebug } from '../QDebug';
+
 /**
  * QMap is a template container class that provides an associative array.
  */
@@ -118,3 +120,27 @@ export class QMap<K, V> {
         return this._map.entries();
     }
 }
+
+// Add debugOutput method to QMap
+export interface QMap<K, V> {
+  debugOutput(debug: QDebug): QDebug;
+}
+
+QMap.prototype.debugOutput = function(debug: QDebug): QDebug {
+  debug.nospace().print('QMap(');
+  
+  const keys = this.keys();
+  if (keys.length === 0) {
+    return debug.print(')');
+  }
+  
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (i > 0) {
+      debug.print(', ');
+    }
+    debug.print(key).print(': ').print(this.value(key));
+  }
+  
+  return debug.print(')');
+};

@@ -1,3 +1,5 @@
+import { QDebug } from './QDebug';
+
 /**
  * Represents a point in 2D space
  */
@@ -140,3 +142,12 @@ export class QPoint {
     return `QPoint(${this._x}, ${this._y})`;
   }
 }
+
+// Add debugOutput method to QPoint
+export interface QPoint {
+  debugOutput(debug: QDebug): QDebug;
+}
+
+QPoint.prototype.debugOutput = function(debug: QDebug): QDebug {
+  return debug.nospace().print('QPoint(').print(this._x).print(',').print(this._y).print(')');
+};
