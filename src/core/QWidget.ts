@@ -6,6 +6,8 @@ import { QVariant } from './containers/QVariant';
 import { QPoint } from './QPoint';
 import { QSize } from './QSize';
 import { QRect } from './QRect';
+import { QStyle } from '../style/QStyle';
+import { globalTheme } from '../style/QTheme';
 
 /**
  * Widget state flags
@@ -26,8 +28,17 @@ export enum WidgetState {
  * in addition to the QObject parent-child relationships
  */
 export class QWidget extends QObject {
+  // Static registry to keep track of all active widgets
+  private static activeWidgets: Set<QWidget> = new Set();
+
   // Use QMap for style properties
   private _styleProperties: QMap<string, QVariant> = new QMap<string, QVariant>();
+  
+  // Add style object to handle unified style approach
+  protected style: QStyle;
+  
+  // Component type for theme integration
+  protected componentType: string = '';
   
   // Use QString for text content
   private _text: QString = new QString('');
@@ -60,6 +71,25 @@ export class QWidget extends QObject {
     super(parent);
     if (parent) {
       this.setWidgetParent(parent);
+    }
+
+    // Register this widget in the static registry
+    QWidget.activeWidgets.add(this);
+    
+    // Set component type from constructor name by default
+    this.componentType = this.constructor.name;
+    
+    // Initialize style object
+    this.style = new QStyle();
+    
+    // Apply default theme styles if available
+    try {
+      const themeStyle = globalTheme.getStyle(this.componentType);
+      if (themeStyle) {
+        this.applyThemeStyle(themeStyle);
+      }
+    } catch (e) {
+      // Theme might not be initialized yet, that's okay
     }
   }
 
@@ -130,16 +160,26 @@ export class QWidget extends QObject {
   }
   
   /**
-   * Sets a style property using QVariant for type safety
+   * Sets a style property in both the QMap and the QStyle object
+   * @param name Property name
+   * @param value Property value
    */
-  setStyleProperty(name: string, value: any): void {
+  setStyleProperty(name: string, value: any): this {
     const propertyName = new QString(name).toString();
     const val = new QVariant(value);
     
+    // Update the style object
+    this.style.set(propertyName, value);
+    
+    // Update the style properties map
     this._styleProperties.insert(propertyName, val);
+    
+    // Update the DOM element
     this.updateStyleProperties();
+    
+    return this;
   }
-  
+
   /**
    * Returns a style property value wrapped in QVariant
    */
@@ -690,5 +730,111 @@ export class QWidget extends QObject {
     if (typeof layout.setParentWidget === 'function') {
       layout.setParentWidget(this);
     }
+  }
+
+  /**
+   * Sets the widget's style object directly
+   * @param style The style to apply
+   */
+  setStyle(style: QStyle): this {
+    // Store reference to the style object
+    this.style = style.clone();
+    
+    // Apply all properties from the style object to this widget
+    const propertyMap = style.getPropertyMap();
+    if (propertyMap) {
+      propertyMap.forEach((value, key) => {
+        this.setStyleProperty(key, value);
+      });
+    }
+    
+    this.updateStyle();
+    return this;
+  }
+  
+  /**
+   * Get the current style object
+   */
+  getStyle(): QStyle {
+    return this.style;
+  }
+
+  /**
+   * Apply theme style to this widget
+   * @param themeStyle The style from the theme
+   */
+  protected applyThemeStyle(themeStyle: QStyle): void {
+    // Merge with existing style
+    if (this.style) {
+      this.style.merge(themeStyle);
+    } else {
+      this.style = themeStyle.clone();
+    }
+    
+    // Apply to widget element
+    this.setStyle(this.style);
+  }
+  
+  /**
+   * Updates the widget's style based on current properties
+   */
+  updateStyle(): void {
+    // Apply all style properties to the element
+    this.updateStyleProperties();
+    
+    // Emit style changed signal
+    this.emit('styleChanged', this.style);
+  }
+
+  /**
+   * Removes this widget from the static registry when destroyed
+   */
+  destroy(): void {
+    // Remove from registry
+    QWidget.activeWidgets.delete(this);
+    
+    // Call base implementation
+    super.destroy();
+  }
+
+  /**
+   * Notifies all active widgets that the theme has changed
+   * Each widget will update its styles accordingly
+   */
+  static notifyAllWidgetsOfThemeChange(): void {
+    QWidget.activeWidgets.forEach(widget => {
+      widget.onThemeChanged();
+    });
+  }
+
+  /**
+   * Called when the global theme changes
+   * Override in subclasses to refresh styles based on the new theme
+   */
+  protected onThemeChanged(): void {
+    // Default implementation refreshes styles from the theme
+    if (this.componentType) {
+      try {
+        const themeStyle = globalTheme.getStyle(this.componentType);
+        this.refreshStyleFromTheme(themeStyle);
+      } catch (e) {
+        console.warn(`Failed to get style for ${this.componentType}:`, e);
+      }
+    }
+  }
+
+  /**
+   * Refreshes this widget's style from the theme
+   * @param themeStyle The style from theme to apply
+   */
+  protected refreshStyleFromTheme(themeStyle: QStyle): void {
+    // Clone the existing style to preserve custom style properties
+    const newStyle = this.style.clone();
+    
+    // Merge theme style with existing style
+    newStyle.merge(themeStyle, false); // Don't override existing properties
+    
+    // Apply the merged style
+    this.setStyle(newStyle);
   }
 }

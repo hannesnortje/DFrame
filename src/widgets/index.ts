@@ -10,6 +10,8 @@ export {
     QPushButton
 };
 
+export * from './QButton';
+
 // Placeholder for future widget implementations
 export const createWidget = (options?: WidgetOptions) => {
     return options;
