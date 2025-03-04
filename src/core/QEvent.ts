@@ -1,119 +1,92 @@
 import { QObject } from './QObject';
 
 /**
- * Event types enumeration
+ * Event type enumeration
  */
 export enum QEventType {
   None = 0,
   Close = 1,
-  Resize = 2,
-  MouseButtonPress = 3,
-  MouseButtonRelease = 4,
-  MouseDoubleClick = 5,
-  MouseMove = 6,
-  MouseEnter = 7,
-  MouseLeave = 8,
-  KeyPress = 9,
-  KeyRelease = 10,
-  FocusIn = 11,
-  FocusOut = 12,
-  Show = 13,
-  Hide = 14,
-  WindowActivate = 15,
-  WindowDeactivate = 16,
+  Show = 2,
+  Hide = 3,
+  Resize = 4,
+  MouseMove = 5,
+  FocusIn = 6,
+  FocusOut = 7,
+  MouseEnter = 8,
+  MouseLeave = 9,
+  EnabledChanged = 10,
+  WindowActivate = 11,
+  WindowDeactivate = 12,
+  MouseButtonPress = 13,
+  MouseButtonRelease = 14,
+  KeyPress = 15,
+  KeyRelease = 16,
   Paint = 17,
-  DragEnter = 18,
-  DragLeave = 19,
-  DragMove = 20,
-  Drop = 21,
-  Wheel = 22,
-  ContextMenu = 23,
-  Timer = 24,
-  ToolTip = 25,
-  HoverEnter = 26,
-  HoverLeave = 27,
-  Scroll = 28,
-  TabletMove = 29,
-  TabletPress = 30,
-  TabletRelease = 31
+  Timer = 18,
+  User = 1000
 }
 
 export { QEventType as EventType };
 
 /**
- * Base class for all events
+ * Base class for all events in the framework
  */
 export class QEvent {
   private _type: QEventType;
-  private _accepted: boolean;
-  
+  private _accepted: boolean = true;
+  private _timestamp: number;
+
+  /**
+   * Creates a new QEvent
+   * @param type The event type
+   */
   constructor(type: QEventType) {
     this._type = type;
-    this._accepted = true;
+    this._timestamp = Date.now();
   }
-  
+
   /**
-   * Returns the event type
+   * Gets the event type
    */
   type(): QEventType {
     return this._type;
   }
-  
+
   /**
-   * Alias for type() to maintain compatibility with tests
-   */
-  getType(): QEventType {
-    return this._type;
-  }
-  
-  /**
-   * Sets whether the event is accepted
-   */
-  setAccepted(accepted: boolean): void {
-    this._accepted = accepted;
-  }
-  
-  /**
-   * Returns whether the event is accepted
+   * Checks if the event is accepted
    */
   isAccepted(): boolean {
     return this._accepted;
   }
-  
+
   /**
-   * Accepts the event
+   * Sets whether the event is accepted
+   * @param accepted True to accept, false to ignore
+   */
+  setAccepted(accepted: boolean): void {
+    this._accepted = accepted;
+  }
+
+  /**
+   * Accept this event
    */
   accept(): void {
     this._accepted = true;
   }
-  
+
   /**
-   * Ignores the event
+   * Ignore this event
    */
   ignore(): void {
     this._accepted = false;
   }
-  
+
   /**
-   * Register a custom event type
+   * Gets the timestamp when this event was created
    */
-  static registerEventType(): QEventType {
-    // Start custom event types at 1000 to ensure they are well above predefined ones
-    // This matches the expectation in the test
-    const baseCustomId = 1000; 
-    
-    // If this is the first custom event, start at baseCustomId
-    if (QEvent.lastCustomEventTypeId < baseCustomId) {
-      QEvent.lastCustomEventTypeId = baseCustomId - 1;
-    }
-    
-    // Generate a new event type ID by adding to the last known ID
-    const nextId = ++QEvent.lastCustomEventTypeId;
-    return nextId;
+  timestamp(): number {
+    return this._timestamp;
   }
-  
-  // Track the last custom event type ID
-  private static lastCustomEventTypeId: number = QEventType.TabletRelease;
 }
 
 /**

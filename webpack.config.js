@@ -2,18 +2,26 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
-  entry: './src/index.ts',
+  entry: './src/main.ts',
+  mode: 'development',
+  devtool: 'inline-source-map',
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
-        exclude: /node_modules/,
+        use: {
+          loader: 'ts-loader',
+          options: {
+            configFile: 'tsconfig.build.json'
+          }
+        },
+        exclude: [/node_modules/, /QDefaultStyle\.ts$/],
       },
     ],
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
+    modules: [path.resolve(__dirname, 'src'), 'node_modules'],
   },
   output: {
     filename: 'bundle.js',
@@ -21,22 +29,13 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './public/index.html',
+      template: 'public/index.html',
       inject: 'body'
     })
   ],
   devServer: {
     static: {
       directory: path.join(__dirname, 'public'),
-    },
-    headers: {
-      'Content-Security-Policy': [
-        "default-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
-        "connect-src 'self' ws:"
-      ].join('; '),
     },
     compress: true,
     port: 9000,

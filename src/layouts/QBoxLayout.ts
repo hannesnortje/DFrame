@@ -1,350 +1,418 @@
 import { QWidget } from '../core/QWidget';
-import { QObject } from '../core/QObject';
+import { QRect } from '../core/QRect';
+import { QSize } from '../core/QSize';
 
 /**
- * Layout direction enum for QBoxLayout
+ * Layout direction
  */
 export enum Direction {
-  LeftToRight = 0,
-  RightToLeft = 1,
-  TopToBottom = 2,
-  BottomToTop = 3
+  LeftToRight,
+  RightToLeft,
+  TopToBottom,
+  BottomToTop
 }
 
 /**
- * Layout item interface
+ * Stretch factor and alignment information
  */
-export interface LayoutItem {
+interface ItemInfo {
   widget: QWidget;
   stretch: number;
-  alignment?: number;
+  alignment?: string;
 }
 
 /**
- * A box layout class that arranges widgets in a line
+ * Base class for box layouts
  */
-export class QBoxLayout extends QObject {
-  // Export the Direction enum as a static property
-  static readonly LeftToRight = Direction.LeftToRight;
-  static readonly RightToLeft = Direction.RightToLeft;
-  static readonly TopToBottom = Direction.TopToBottom;
-  static readonly BottomToTop = Direction.BottomToTop;
-  
-  // Make direction accessible for tests
-  direction: Direction;
-  
-  // Make items accessible for tests
-  items: LayoutItem[] = [];
-  
-  private _spacing: number = 6;
-  private _margin: number = 9;
-  private _parentWidget: QWidget | null = null;
+export class QBoxLayout {
+  protected _direction: Direction;
+  protected _spacing: number = 5;
+  protected _margin: number = 10;
+  protected _items: ItemInfo[] = [];
+  protected _parent: QWidget | null = null;
   
   /**
-   * Create a new box layout with the specified direction
+   * Creates a new QBoxLayout
+   * @param direction Direction of layout
    */
   constructor(direction: Direction = Direction.LeftToRight) {
-    super(null);
-    this.direction = direction;
+    this._direction = direction;
   }
   
   /**
-   * Add a widget to the layout
+   * Sets the widget this layout is attached to
    */
-  addWidget(widget: QWidget, stretch: number = 0, alignment?: number): void {
-    this.items.push({
-      widget,
-      stretch,
-      alignment
-    });
-    
-    if (this._parentWidget) {
-      widget.setParent(this._parentWidget);
-      this.update();
-    }
-    
-    this.emit('layoutChanged');
+  setParent(parent: QWidget | null): void {
+    this._parent = parent;
+    this.invalidate();
   }
   
   /**
-   * Insert a widget at a specific index
+   * Gets the parent widget
    */
-  insertWidget(index: number, widget: QWidget, stretch: number = 0, alignment?: number): void {
-    // Ensure index is valid
-    if (index < 0) index = 0;
-    if (index > this.items.length) index = this.items.length;
-    
-    this.items.splice(index, 0, {
-      widget,
-      stretch,
-      alignment
-    });
-    
-    if (this._parentWidget) {
-      widget.setParent(this._parentWidget);
-      this.update();
-    }
-    
-    this.emit('layoutChanged');
+  parent(): QWidget | null {
+    return this._parent;
   }
   
   /**
-   * Remove a widget from the layout
+   * Sets the direction of the layout
    */
-  removeWidget(widget: QWidget): void {
-    const index = this.items.findIndex(item => item.widget === widget);
-    
-    if (index !== -1) {
-      this.items.splice(index, 1);
-      
-      if (this._parentWidget) {
-        widget.setParent(null);
-        this.update();
-      }
-      
-      this.emit('layoutChanged');
-    }
+  setDirection(direction: Direction): void {
+    this._direction = direction;
+    this.invalidate();
   }
   
   /**
-   * Get item at specific index
+   * Gets the direction of the layout
    */
-  itemAt(index: number): LayoutItem | null {
-    if (index < 0 || index >= this.items.length) {
-      return null;
-    }
-    return this.items[index];
+  direction(): Direction {
+    return this._direction;
   }
   
   /**
-   * Get number of items in layout
-   */
-  count(): number {
-    return this.items.length;
-  }
-  
-  /**
-   * Add a stretchable space
-   */
-  addStretch(stretch: number = 0): void {
-    // Create a dummy QWidget as a placeholder
-    const stretchWidget = new QWidget();
-    stretchWidget.setObjectName('stretch-spacer');
-    
-    // Add to items with the stretch factor
-    this.items.push({
-      widget: stretchWidget,
-      stretch
-    });
-    
-    if (this._parentWidget) {
-      stretchWidget.setParent(this._parentWidget);
-      this.update();
-    }
-    
-    this.emit('layoutChanged');
-  }
-  
-  /**
-   * Set the parent widget for this layout
-   */
-  setParentWidget(widget: QWidget): void {
-    this._parentWidget = widget;
-    
-    // Set the parent for all widgets in the layout
-    for (const item of this.items) {
-      if (item.widget) {
-        item.widget.setParent(widget);
-      }
-    }
-    
-    this.update();
-    this.emit('layoutChanged');
-  }
-  
-  /**
-   * Set the layout for a widget
-   */
-  setLayout(layout: QBoxLayout): void {
-    if (this._parentWidget) {
-      layout.setParentWidget(this._parentWidget);
-    }
-  }
-  
-  /**
-   * Set the spacing between items
+   * Sets the spacing between items
    */
   setSpacing(spacing: number): void {
     this._spacing = spacing;
-    this.update();
-    this.emit('layoutChanged');
+    this.invalidate();
   }
   
   /**
-   * Get the spacing between items
+   * Gets the spacing between items
    */
-  getSpacing(): number {
+  spacing(): number {
     return this._spacing;
   }
   
   /**
-   * Set the margin around the layout
+   * Sets the margin around the layout
    */
   setMargin(margin: number): void {
     this._margin = margin;
-    this.update();
-    this.emit('layoutChanged');
+    this.invalidate();
   }
   
   /**
-   * Get the margin around the layout
+   * Gets the margin around the layout
    */
-  getMargin(): number {
+  margin(): number {
     return this._margin;
   }
   
   /**
-   * Set the layout direction
+   * Adds a widget to the layout
+   * @param widget Widget to add
+   * @param stretch Stretch factor
+   * @param alignment Optional alignment
    */
-  setDirection(direction: Direction): void {
-    this.direction = direction;
-    this.update();
-    this.emit('layoutChanged');
+  addWidget(widget: QWidget, stretch: number = 0, alignment?: string): void {
+    this._items.push({ 
+      widget, 
+      stretch, 
+      alignment 
+    });
+    
+    if (this._parent && widget.parent() !== this._parent) {
+      widget.setParent(this._parent);
+    }
+    
+    this.invalidate();
   }
   
   /**
-   * Get the layout direction
+   * Adds a stretch to the layout
+   * @param stretch Stretch factor
    */
-  getDirection(): Direction {
-    return this.direction;
+  addStretch(stretch: number = 1): void {
+    // Create a dummy spacer widget
+    const spacer = new QWidget();
+    spacer.setMinimumSize(0, 0);
+    spacer.setMaximumSize(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+    
+    if (this._parent) {
+      spacer.setParent(this._parent);
+    }
+    
+    this._items.push({ 
+      widget: spacer, 
+      stretch: stretch 
+    });
+    
+    this.invalidate();
+  }
+  
+  /**
+   * Adds spacing to the layout
+   * @param size Size of the spacing
+   */
+  addSpacing(size: number): void {
+    // Create a fixed-size spacer widget
+    const spacer = new QWidget();
+    
+    if (this._direction === Direction.LeftToRight || this._direction === Direction.RightToLeft) {
+      spacer.setFixedSize(size, 0);
+    } else {
+      spacer.setFixedSize(0, size);
+    }
+    
+    if (this._parent) {
+      spacer.setParent(this._parent);
+    }
+    
+    this._items.push({ 
+      widget: spacer, 
+      stretch: 0 
+    });
+    
+    this.invalidate();
+  }
+  
+  /**
+   * Removes a widget from the layout
+   * @param widget Widget to remove
+   */
+  removeWidget(widget: QWidget): void {
+    const index = this._items.findIndex(item => item.widget === widget);
+    
+    if (index !== -1) {
+      this._items.splice(index, 1);
+      this.invalidate();
+    }
+  }
+  
+  /**
+   * Removes all widgets from the layout
+   */
+  removeAllWidgets(): void {
+    this._items = [];
+    this.invalidate();
   }
   
   /**
    * Updates the layout
    */
-  update(): void {
-    if (!this._parentWidget) return;
+  invalidate(): void {
+    if (this._parent) {
+      this.updateLayout();
+    }
+  }
+  
+  /**
+   * Updates the layout geometry
+   */
+  updateLayout(): void {
+    if (!this._parent) return;
     
-    const rect = this._parentWidget.geometry();
-    const isHorizontal = this.direction === Direction.LeftToRight || 
-                         this.direction === Direction.RightToLeft;
+    const rect = this._parent.geometry();
+    const availableWidth = rect.width() - (this._margin * 2);
+    const availableHeight = rect.height() - (this._margin * 2);
     
-    // First pass: calculate minimum required space and total stretch factors
+    // Calculate total stretch and fixed size
     let totalStretch = 0;
-    let itemCount = 0;
-    let totalMinimumSpace = 0;
-    const minimumSizes: number[] = [];
+    let totalFixedSize = 0;
     
-    // Calculate minimum sizes and total stretch
-    for (let i = 0; i < this.items.length; i++) {
-      const item = this.items[i];
-      if (!item.widget) {
-        minimumSizes.push(0);
-        continue;
-      }
-      
-      // Get minimum size
-      let minSize = 0;
-      if (isHorizontal) {
-        minSize = item.widget.minimumSize().width();
+    for (const item of this._items) {
+      if (item.stretch > 0) {
+        totalStretch += item.stretch;
       } else {
-        minSize = item.widget.minimumSize().height();
+        const size = this.isHorizontal() 
+          ? item.widget.width
+          : item.widget.height;
+        totalFixedSize += size;
       }
-      
-      // If minimum size is not set, use a reasonable default
-      if (minSize <= 0) {
-        minSize = isHorizontal ? 10 : 10;
-      }
-      
-      minimumSizes.push(minSize);
-      totalMinimumSpace += minSize;
-      totalStretch += item.stretch > 0 ? item.stretch : 1;
-      itemCount++;
     }
     
-    // Calculate available space
-    let availableSpace = isHorizontal ? rect.width() : rect.height();
-    availableSpace -= this._margin * 2; // margins on both sides
-    availableSpace -= this._spacing * (Math.max(0, itemCount - 1)); // spacing between items
+    // Add spacing
+    if (this._items.length > 1) {
+      totalFixedSize += (this._items.length - 1) * this._spacing;
+    }
     
-    // If available space is less than minimum required, use minimum sizes
-    const useMinimumSizes = availableSpace < totalMinimumSpace;
+    // Calculate available space for stretched items
+    const availableSizeForStretch = this.isHorizontal() 
+      ? availableWidth - totalFixedSize
+      : availableHeight - totalFixedSize;
     
-    // Calculate freeSpace (space available after allocating minimums)
-    const freeSpace = Math.max(0, availableSpace - totalMinimumSpace);
-    
-    // Calculate starting position
+    // Position items
     let pos = this._margin;
-    if (this.direction === Direction.RightToLeft) {
-      pos = rect.width() - this._margin;
-    } else if (this.direction === Direction.BottomToTop) {
-      pos = rect.height() - this._margin;
+    
+    for (let i = 0; i < this._items.length; i++) {
+      const item = this._items[i];
+      const widget = item.widget;
+      let itemWidth: number;
+      let itemHeight: number;
+      
+      // Calculate width and height
+      if (this.isHorizontal()) {
+        // Horizontal layout
+        if (item.stretch > 0 && totalStretch > 0) {
+          itemWidth = Math.floor((item.stretch / totalStretch) * availableSizeForStretch);
+        } else {
+          itemWidth = widget.width;
+        }
+        itemHeight = availableHeight;
+      } else {
+        // Vertical layout
+        itemWidth = availableWidth;
+        if (item.stretch > 0 && totalStretch > 0) {
+          itemHeight = Math.floor((item.stretch / totalStretch) * availableSizeForStretch);
+        } else {
+          itemHeight = widget.height;
+        }
+      }
+      
+      // Set position and size
+      if (this.isHorizontal()) {
+        widget.setGeometry(new QRect(
+          rect.x() + pos,
+          rect.y() + this._margin,
+          itemWidth,
+          itemHeight
+        ));
+        pos += itemWidth + this._spacing;
+      } else {
+        widget.setGeometry(new QRect(
+          rect.x() + this._margin,
+          rect.y() + pos,
+          itemWidth,
+          itemHeight
+        ));
+        pos += itemHeight + this._spacing;
+      }
+    }
+  }
+  
+  /**
+   * Sets fixed width and height for a widget
+   */
+  private setFixedSize(widget: QWidget, width: number, height: number): void {
+    widget.setMinimumSize(width, height);
+    widget.setMaximumSize(width, height);
+  }
+  
+  /**
+   * Checks if the layout is horizontal
+   */
+  private isHorizontal(): boolean {
+    return this._direction === Direction.LeftToRight || 
+           this._direction === Direction.RightToLeft;
+  }
+}
+
+/**
+ * Horizontal box layout
+ */
+export class QHBoxLayout extends QBoxLayout {
+  constructor() {
+    super(Direction.LeftToRight);
+  }
+}
+
+/**
+ * Vertical box layout
+ */
+export class QVBoxLayout extends QBoxLayout {
+  constructor() {
+    super(Direction.TopToBottom);
+  }
+}
+
+/**
+ * Grid layout
+ */
+export class QGridLayout {
+  private _parent: QWidget | null = null;
+  private _grid: Map<string, QWidget> = new Map();
+  private _spacing: number = 5;
+  private _margin: number = 10;
+  private _rows: number = 0;
+  private _columns: number = 0;
+  
+  /**
+   * Sets the parent widget
+   */
+  setParent(parent: QWidget | null): void {
+    this._parent = parent;
+    this.invalidate();
+  }
+  
+  /**
+   * Adds a widget to the grid
+   */
+  addWidget(widget: QWidget, row: number, column: number, rowSpan: number = 1, columnSpan: number = 1): void {
+    const key = `${row},${column}`;
+    this._grid.set(key, widget);
+    
+    // Update row and column count
+    this._rows = Math.max(this._rows, row + rowSpan);
+    this._columns = Math.max(this._columns, column + columnSpan);
+    
+    if (this._parent && widget.parent() !== this._parent) {
+      widget.setParent(this._parent);
     }
     
-    // Second pass: allocate space to widgets
-    for (let i = 0; i < this.items.length; i++) {
-      const item = this.items[i];
-      if (!item.widget) continue;
-      
-      // Start with minimum size
-      let size = minimumSizes[i];
-      
-      // Add extra space according to stretch factor if available
-      if (!useMinimumSizes && freeSpace > 0 && totalStretch > 0) {
-        const stretch = item.stretch > 0 ? item.stretch : 1;
-        const extraSpace = Math.floor(freeSpace * (stretch / totalStretch));
-        size += extraSpace;
-      }
-      
-      // Calculate item geometry
-      let x = 0;
-      let y = 0;
-      let width = 0;
-      let height = 0;
-      
-      if (this.direction === Direction.LeftToRight) {
-        x = pos;
-        y = this._margin;
-        width = size;
-        height = rect.height() - this._margin * 2;
-        pos += size + this._spacing;
-      } else if (this.direction === Direction.RightToLeft) {
-        x = pos - size;
-        y = this._margin;
-        width = size;
-        height = rect.height() - this._margin * 2;
-        pos = x - this._spacing;
-      } else if (this.direction === Direction.TopToBottom) {
-        x = this._margin;
-        y = pos;
-        width = rect.width() - this._margin * 2;
-        height = size;
-        pos += size + this._spacing;
-      } else { // BottomToTop
-        x = this._margin;
-        y = pos - size;
-        width = rect.width() - this._margin * 2;
-        height = size;
-        pos = y - this._spacing;
-      }
-      
-      // Apply size constraints from min/max sizes
-      if (isHorizontal) {
-        const maxWidth = item.widget.maximumSize().width();
-        if (maxWidth > 0 && width > maxWidth) width = maxWidth;
-        
-        const minWidth = item.widget.minimumSize().width();
-        if (minWidth > 0 && width < minWidth) width = minWidth;
-      } else {
-        const maxHeight = item.widget.maximumSize().height();
-        if (maxHeight > 0 && height > maxHeight) height = maxHeight;
-        
-        const minHeight = item.widget.minimumSize().height();
-        if (minHeight > 0 && height < minHeight) height = minHeight;
-      }
-      
-      // Set the geometry
-      item.widget.setGeometry({ x, y, width, height });
+    this.invalidate();
+  }
+  
+  /**
+   * Updates the layout
+   */
+  invalidate(): void {
+    if (this._parent) {
+      this.updateLayout();
     }
+  }
+  
+  /**
+   * Updates the layout geometry
+   */
+  updateLayout(): void {
+    if (!this._parent) return;
+    
+    const rect = this._parent.geometry();
+    const availableWidth = rect.width() - (this._margin * 2);
+    const availableHeight = rect.height() - (this._margin * 2);
+    
+    const cellWidth = this._columns > 0 ? availableWidth / this._columns : 0;
+    const cellHeight = this._rows > 0 ? availableHeight / this._rows : 0;
+    
+    // Position each widget in the grid
+    this._grid.forEach((widget, key) => {
+      const [row, column] = key.split(',').map(Number);
+      
+      const x = rect.x() + this._margin + (column * cellWidth);
+      const y = rect.y() + this._margin + (row * cellHeight);
+      
+      widget.setGeometry(new QRect(x, y, cellWidth - this._spacing, cellHeight - this._spacing));
+    });
+  }
+  
+  /**
+   * Sets the spacing between items
+   */
+  setSpacing(spacing: number): void {
+    this._spacing = spacing;
+    this.invalidate();
+  }
+  
+  /**
+   * Gets the spacing between items
+   */
+  spacing(): number {
+    return this._spacing;
+  }
+  
+  /**
+   * Sets the margin around the layout
+   */
+  setMargin(margin: number): void {
+    this._margin = margin;
+    this.invalidate();
+  }
+  
+  /**
+   * Gets the margin around the layout
+   */
+  margin(): number {
+    return this._margin;
   }
 }

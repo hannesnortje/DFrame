@@ -3,11 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DFrame</title>
+    <title>DFrame Widget Showcase</title>
     <link rel="stylesheet" href="/styles.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🖼️</text></svg>">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: fixed;
+            background: #f0f0f0;
+        }
+        #qapp-root {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: visible !important;
+            background-color: #f0f0f0;
+            z-index: 1;
+        }
+        .qwidget {
+            position: absolute !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            box-sizing: border-box;
+            background: white;
+        }
+        .qwidget button {
+            all: unset;
+            padding: 8px 16px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: system-ui;
+            font-size: 14px;
+        }
+        .qwidget button:hover {
+            background: #e5e5e5;
+        }
+    </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="qapp-root"></div>
+    <script>
+    // Force styles to be applied
+    document.addEventListener('DOMContentLoaded', () => {
+        const root = document.getElementById('qapp-root');
+        if (root) {
+            root.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                overflow: visible !important;
+                background: #f0f0f0 !important;
+                z-index: 1 !important;
+                display: block !important;
+                visibility: visible !important;
+            `;
+        }
+    });
+    </script>
+    <script src="bundle.js"></script>
 </body>
 </html>

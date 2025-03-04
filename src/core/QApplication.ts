@@ -1,7 +1,7 @@
 import { QCoreApplication } from './QCoreApplication';
 import { QEvent, QEventType } from './QEvent';
 import { QWidget } from './QWidget';
-import { QString } from './containers/QString';
+import { defaultStyle } from '../style';  // Updated import
 
 /**
  * Main application class with GUI support
@@ -11,18 +11,55 @@ export class QApplication extends QCoreApplication {
   private _styleSheet: string = '';
   private _activeWindow: QWidget | null = null;
   private _focusWidget: QWidget | null = null;
+  private _applicationName: string = '';
+  private _rootElement: HTMLElement | null = null;
   
   /**
    * Creates a new QApplication
    */
   constructor(args: string[] = []) {
     super(args);
+    console.log('QApplication: Initializing...');
     
-    // Cast to the right type
-    if (QCoreApplication._instance instanceof QApplication && 
-        QCoreApplication._instance !== this) {
-      // For testing we'll replace the instance rather than throw
-      console.warn('QApplication is already instantiated, replacing instance for tests');
+    // Initialize style system
+    const style = defaultStyle;
+    
+    // Create root element immediately
+    if (typeof document !== 'undefined') {
+      console.log('QApplication: Setting up DOM');
+      this._rootElement = document.getElementById('qapp-root');
+      if (!this._rootElement) {
+        console.log('QApplication: Creating root element');
+        this._rootElement = document.createElement('div');
+        this._rootElement.id = 'qapp-root';
+        this._rootElement.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          overflow: hidden;
+          background-color: #f0f0f0;
+          z-index: 1;
+          display: block;
+          visibility: visible;
+        `;
+        document.body.appendChild(this._rootElement);
+        console.log('QApplication: Root element created and mounted', this._rootElement);
+      }
+      
+      // Reset document body styles
+      document.body.style.cssText = `
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        position: fixed;
+      `;
+      
+      // Apply default style
+      this.setStyleSheet(style.styleSheet());
     }
     
     // Update window event handling
@@ -33,83 +70,152 @@ export class QApplication extends QCoreApplication {
   }
   
   /**
-   * Returns the QApplication instance
+   * Handle window resize events
    */
-  static instance(): QApplication {
-    if (!QCoreApplication._instance || !(QCoreApplication._instance instanceof QApplication)) {
-      throw new Error('QApplication is not instantiated');
-    }
-    return QCoreApplication._instance as QApplication;
+  private handleWindowResize(): void {
+    this._windows.forEach(window => {
+      const event = new QEvent(QEventType.Resize);
+      this.sendEventObject(window, event);
+    });
   }
   
   /**
-   * Sets the application-wide stylesheet
+   * Handle window close events
+   */
+  private handleWindowClose(): void {
+    this._windows.forEach(window => {
+      const event = new QEvent(QEventType.Close);
+      this.sendEventObject(window, event);
+    });
+  }
+  
+  /**
+   * Set the application name
+   */
+  setApplicationName(name: string): void {
+    this._applicationName = name;
+    this.emit('applicationNameChanged', name);
+    
+    if (typeof document !== 'undefined') {
+      document.title = name;
+    }
+  }
+  
+  /**
+   * Get the application name
+   */
+  applicationName(): string {
+    return this._applicationName;
+  }
+  
+  /**
+   * Set the stylesheet for the application
    */
   setStyleSheet(styleSheet: string): void {
     this._styleSheet = styleSheet;
-    
-    // Apply stylesheet to existing widgets
     this._windows.forEach(window => {
       this.applyStyleSheetToWidget(window, styleSheet);
     });
   }
   
   /**
-   * Returns the application-wide stylesheet
+   * Apply stylesheet to a widget and its children
+   */
+  private applyStyleSheetToWidget(widget: QWidget, styleSheet: string): void {
+    widget.updateStyleFromApplication(styleSheet);
+    widget.children().forEach(child => {
+      if (child instanceof QWidget) {
+        this.applyStyleSheetToWidget(child, styleSheet);
+      }
+    });
+  }
+  
+  /**
+   * Get the current stylesheet
    */
   styleSheet(): string {
     return this._styleSheet;
   }
   
   /**
-   * Applies the stylesheet to a widget hierarchy
+   * Register a widget with the application
    */
-  private applyStyleSheetToWidget(widget: QWidget, styleSheet: string): void {
-    // Apply to root widget
-    if (typeof widget.updateStyleFromApplication === 'function') {
-      widget.updateStyleFromApplication(this._styleSheet);
-    }
-    
-    // Apply to child widgets recursively
-    const children = widget.children();
-    for (let i = 0; i < children.length; i++) {
-      const child = children[i];
-      if (child instanceof QWidget) {
-        this.applyStyleSheetToWidget(child, styleSheet);
+  registerWidget(widget: QWidget): void {
+    console.log('QApplication: Registering widget', widget);
+    if (!this._windows.includes(widget)) {
+      this._windows.push(widget);
+      
+      if (this._rootElement && widget.element) {
+        console.log('QApplication: Mounting widget to DOM');
+        
+        // Set essential styles
+        this._rootElement.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          overflow: hidden;
+          background-color: #f0f0f0;
+          z-index: 1;
+          display: block !important;
+          visibility: visible !important;
+        `;
+        
+        // Force immediate style update before mounting
+        widget.element.style.cssText = `
+          position: absolute;
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          z-index: ${this._windows.length + 1};
+          transform: translateZ(0);
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          background: white;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        `;
+        
+        // Mount to DOM
+        this._rootElement.appendChild(widget.element);
+        
+        // Force a reflow and update
+        widget.element.offsetHeight;
+        widget.updateElement();
+        
+        console.log('QApplication: Widget mounted with styles:', {
+          widget,
+          rootStyles: window.getComputedStyle(this._rootElement),
+          widgetStyles: window.getComputedStyle(widget.element)
+        });
       }
+      
+      this.setActiveWindow(widget);
     }
   }
   
   /**
-   * Window resize handler
+   * Close all windows
    */
-  private handleWindowResize(e: Event): void {
-    // Create and post resize events to top-level widgets
-    this._windows.forEach(widget => {
-      const event = new QEvent(QEventType.Resize);
-      this.sendEventObject(widget, event);
-    });
-  }
-  
-  /**
-   * Window close handler
-   */
-  private handleWindowClose(e: Event): void {
-    // Create and post close events to top-level widgets
-    this._windows.forEach(widget => {
+  closeAllWindows(): void {
+    this._activeWindow = null;
+    this._focusWidget = null;
+    
+    [...this._windows].forEach(window => {
       const event = new QEvent(QEventType.Close);
-      this.sendEventObject(widget, event);
+      this.sendEventObject(window, event);
+      this._windows = this._windows.filter(w => w !== window);
     });
   }
   
   /**
-   * Sets the active window and returns the previous one
+   * Set the active window
    */
   setActiveWindow(window: QWidget | null): QWidget | null {
     const prev = this._activeWindow;
     
     if (this._activeWindow !== window) {
-      // Deactivate previous window
       if (this._activeWindow) {
         const event = new QEvent(QEventType.WindowDeactivate);
         this.sendEventObject(this._activeWindow, event);
@@ -117,15 +223,9 @@ export class QApplication extends QCoreApplication {
       
       this._activeWindow = window;
       
-      // Activate new window
       if (window) {
         const event = new QEvent(QEventType.WindowActivate);
         this.sendEventObject(window, event);
-        
-        // Add to window list if not already there
-        if (!this._windows.includes(window)) {
-          this._windows.push(window);
-        }
       }
     }
     
@@ -133,18 +233,17 @@ export class QApplication extends QCoreApplication {
   }
   
   /**
-   * Returns the active window
+   * Get the active window
    */
   activeWindow(): QWidget | null {
     return this._activeWindow;
   }
   
   /**
-   * Sets the focus widget
+   * Set the widget with keyboard focus
    */
   setFocusWidget(widget: QWidget | null): void {
     if (this._focusWidget !== widget) {
-      // Remove focus from previous widget
       if (this._focusWidget) {
         const event = new QEvent(QEventType.FocusOut);
         this.sendEventObject(this._focusWidget, event);
@@ -152,7 +251,6 @@ export class QApplication extends QCoreApplication {
       
       this._focusWidget = widget;
       
-      // Set focus to new widget
       if (widget) {
         const event = new QEvent(QEventType.FocusIn);
         this.sendEventObject(widget, event);
@@ -161,52 +259,18 @@ export class QApplication extends QCoreApplication {
   }
   
   /**
-   * Returns the widget with input focus
+   * Get the widget with keyboard focus
    */
   focusWidget(): QWidget | null {
     return this._focusWidget;
   }
   
   /**
-   * Process events in the event queue
-   */
-  processEvents(): void {
-    super.processEvents();
-  }
-  
-  /**
-   * Closes all windows and cleans up
-   */
-  closeAllWindows(): void {
-    // Clear references - this is needed for tests to pass
-    this._activeWindow = null;
-    this._focusWidget = null;
-    
-    // Close each window
-    const windows = [...this._windows];
-    windows.forEach(window => {
-      const event = new QEvent(QEventType.Close);
-      this.sendEventObject(window, event);
-      this._windows = this._windows.filter(w => w !== window);
-    });
-  }
-  
-  /**
-   * Exit the application
-   * Override the quit method to accept an optional exit code
+   * Override quit to cleanup resources
    */
   quit(exitCode: number = 0): void {
     this.closeAllWindows();
     super.quit(exitCode);
     QCoreApplication._instance = null;
-  }
-
-  /**
-   * Register a widget with the application
-   */
-  registerWidget(widget: QWidget): void {
-    if (!this._windows.includes(widget)) {
-      this._windows.push(widget);
-    }
   }
 }

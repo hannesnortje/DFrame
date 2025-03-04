@@ -16,3 +16,5 @@ export * from './QButton';
 export const createWidget = (options?: WidgetOptions) => {
     return options;
 };
+
+export { QLabel } from './QLabel';

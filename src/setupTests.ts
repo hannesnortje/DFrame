@@ -1,4 +1,54 @@
-// Setup file for Jest tests
+import '@testing-library/jest-dom';
+
+// Mock window and document
+declare global {
+  namespace NodeJS {
+    interface Global {
+      window: Window & typeof globalThis;
+      document: Document;
+      HTMLElement: typeof HTMLElement;
+      Buffer: typeof Buffer;
+    }
+  }
+}
+
+// Mock window object
+if (typeof window === 'undefined') {
+  (global as any).window = {
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn()
+  };
+}
+
+// Mock document object
+if (typeof document === 'undefined') {
+  (global as any).document = {
+    createElement: jest.fn().mockReturnValue({
+      style: {},
+      classList: {
+        add: jest.fn(),
+        remove: jest.fn(),
+        toggle: jest.fn()
+      }
+    }),
+    getElementById: jest.fn(),
+    body: {
+      appendChild: jest.fn()
+    }
+  };
+}
+
+// Mock HTMLElement
+if (typeof HTMLElement === 'undefined') {
+  (global as any).HTMLElement = class {};
+}
+
+// Mock Buffer if needed
+if (typeof Buffer === 'undefined') {
+  (global as any).Buffer = {
+    from: jest.fn()
+  };
+}
 
 // Polyfill TextEncoder/TextDecoder if needed
 if (typeof global.TextEncoder === 'undefined') {

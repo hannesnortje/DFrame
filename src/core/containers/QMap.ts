@@ -1,124 +1,126 @@
 import { QDebug } from '../QDebug';
 
 /**
- * QMap is a template container class that provides an associative array.
+ * A map container class similar to Qt's QMap
  */
 export class QMap<K, V> {
-    private _map: Map<K, V>;
-    
-    /**
-     * Creates a new QMap
-     */
-    constructor(entries?: Map<K, V> | QMap<K, V> | Array<[K, V]>) {
-        if (entries instanceof QMap) {
-            this._map = new Map(entries.toMap());
-        } else {
-            this._map = new Map(entries);
-        }
-    }
-    
-    /**
-     * Returns the number of (key, value) pairs in the map
-     */
-    size(): number {
-        return this._map.size;
-    }
-    
-    /**
-     * Returns true if the map contains no items
-     */
-    isEmpty(): boolean {
-        return this._map.size === 0;
-    }
-    
-    /**
-     * Inserts a new item with key and value
-     */
-    insert(key: K, value: V): void {
-        this._map.set(key, value);
-    }
-    
-    /**
-     * Returns the value associated with key
-     */
-    value(key: K, defaultValue?: V): V | undefined {
-        if (this._map.has(key)) {
-            return this._map.get(key);
-        }
-        return defaultValue;
-    }
-    
-    /**
-     * Returns true if the map contains an item with key
-     */
-    contains(key: K): boolean {
-        return this._map.has(key);
-    }
-    
-    /**
-     * Removes all items with the given key
-     */
-    remove(key: K): boolean {
-        return this._map.delete(key);
-    }
-    
-    /**
-     * Removes all items from the map
-     */
-    clear(): void {
-        this._map.clear();
-    }
-    
-    /**
-     * Returns a list of all keys in the map
-     */
-    keys(): K[] {
-        return Array.from(this._map.keys());
-    }
-    
-    /**
-     * Returns a list of all values in the map
-     */
-    values(): V[] {
-        return Array.from(this._map.values());
-    }
-    
-    /**
-     * Returns a JavaScript Map
-     */
-    toMap(): Map<K, V> {
-        return new Map(this._map);
-    }
-    
-    /**
-     * Returns an iterator over [key, value] pairs
-     */
-    entries(): IterableIterator<[K, V]> {
-        return this._map.entries();
-    }
-    
-    /**
-     * Takes another map's entries and inserts them into this map
-     */
-    unite(other: QMap<K, V>): void {
-        for (const [key, value] of other.entries()) {
-            this._map.set(key, value);
-        }
-    }
-    
-    /**
-     * Iterates through all key-value pairs
-     */
-    forEach(callback: (value: V, key: K) => void): void {
-        this._map.forEach(callback);
-    }
-    
-    /**
-     * Implements the iterator protocol
-     */
-    [Symbol.iterator](): IterableIterator<[K, V]> {
-        return this._map.entries();
-    }
+  private _map: Map<K, V>;
+  
+  constructor(entries?: readonly (readonly [K, V])[] | null) {
+    this._map = new Map(entries);
+  }
+  
+  /**
+   * Returns the value associated with the key
+   */
+  value(key: K, defaultValue: V | undefined = undefined): V | undefined {
+    return this._map.has(key) ? this._map.get(key) : defaultValue;
+  }
+  
+  /**
+   * Inserts a key-value pair into the map
+   */
+  insert(key: K, value: V): void {
+    this._map.set(key, value);
+  }
+  
+  /**
+   * Removes a key and its associated value from the map
+   */
+  remove(key: K): boolean {
+    return this._map.delete(key);
+  }
+  
+  /**
+   * Returns true if the map contains an item with key
+   */
+  contains(key: K): boolean {
+    return this._map.has(key);
+  }
+  
+  /**
+   * Clears the map
+   */
+  clear(): void {
+    this._map.clear();
+  }
+  
+  /**
+   * Returns the number of items in the map
+   */
+  size(): number {
+    return this._map.size;
+  }
+  
+  /**
+   * Returns true if the map is empty
+   */
+  isEmpty(): boolean {
+    return this._map.size === 0;
+  }
+  
+  /**
+   * Returns the keys in the map
+   */
+  keys(): K[] {
+    return Array.from(this._map.keys());
+  }
+  
+  /**
+   * Returns the values in the map
+   */
+  values(): V[] {
+    return Array.from(this._map.values());
+  }
+  
+  /**
+   * Returns the entries in the map
+   */
+  entries(): [K, V][] {
+    return Array.from(this._map.entries());
+  }
+
+  /**
+   * Executes a provided function once per each key/value pair in the Map
+   */
+  forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void {
+    this._map.forEach(callback);
+  }
+  
+  /**
+   * Returns the underlying Map object
+   */
+  toMap(): Map<K, V> {
+    return new Map(this._map);
+  }
+  
+  /**
+   * Returns an iterator over the keys
+   */
+  keysIterator(): IterableIterator<K> {
+    return this._map.keys();
+  }
+  
+  /**
+   * Returns an iterator over the values
+   */
+  valuesIterator(): IterableIterator<V> {
+    return this._map.values();
+  }
+  
+  /**
+   * Returns an iterator over the entries
+   */
+  entriesIterator(): IterableIterator<[K, V]> {
+    return this._map.entries();
+  }
+  
+  /**
+   * For...of iterability
+   */
+  [Symbol.iterator](): IterableIterator<[K, V]> {
+    return this._map.entries();
+  }
 }
 
 // Add debugOutput method to QMap

@@ -1,221 +1,154 @@
 import { QDebug } from '../QDebug';
 
 /**
- * QString provides an abstraction of Unicode strings with implicit sharing.
- * It offers similar functionality to JavaScript's String with additional Qt-like methods.
+ * String handling class similar to Qt's QString
  */
 export class QString {
-    private _data: string;
-    
-    /**
-     * Creates a new QString
-     */
-    constructor(str: string | QString = '') {
-        this._data = str instanceof QString ? str.toString() : str;
-    }
-    
-    /**
-     * Returns the length of the string
-     */
-    length(): number {
-        return this._data.length;
-    }
-    
-    /**
-     * Returns true if the string is empty
-     */
-    isEmpty(): boolean {
-        return this._data.length === 0;
-    }
-    
-    /**
-     * Returns true if the string is null
-     */
-    isNull(): boolean {
-        return this._data === null;
-    }
-    
-    /**
-     * Returns a substring
-     */
-    mid(pos: number, len: number = -1): QString {
-        if (len < 0) {
-            return new QString(this._data.substring(pos));
-        }
-        return new QString(this._data.substring(pos, pos + len));
-    }
-    
-    /**
-     * Returns the first n characters
-     */
-    left(n: number): QString {
-        return new QString(this._data.substring(0, n));
-    }
-    
-    /**
-     * Returns the last n characters
-     */
-    right(n: number): QString {
-        if (n >= this._data.length) {
-            return new QString(this._data);
-        }
-        return new QString(this._data.substring(this._data.length - n));
-    }
-    
-    /**
-     * Converts the string to lowercase
-     */
-    toLower(): QString {
-        return new QString(this._data.toLowerCase());
-    }
-    
-    /**
-     * Converts the string to uppercase
-     */
-    toUpper(): QString {
-        return new QString(this._data.toUpperCase());
-    }
-    
-    /**
-     * Trims whitespace from both ends
-     */
-    trimmed(): QString {
-        return new QString(this._data.trim());
-    }
-    
-    /**
-     * Returns the position of a substring
-     */
-    indexOf(str: string | QString, from: number = 0): number {
-        const searchStr = str instanceof QString ? str.toString() : str;
-        return this._data.indexOf(searchStr, from);
-    }
-    
-    /**
-     * Returns the last position of a substring
-     */
-    lastIndexOf(str: string | QString, from: number = -1): number {
-        const searchStr = str instanceof QString ? str.toString() : str;
-        if (from < 0) {
-            return this._data.lastIndexOf(searchStr);
-        }
-        return this._data.lastIndexOf(searchStr, from);
-    }
-    
-    /**
-     * Returns true if the string starts with a substring
-     */
-    startsWith(str: string | QString): boolean {
-        const prefix = str instanceof QString ? str.toString() : str;
-        return this._data.startsWith(prefix);
-    }
-    
-    /**
-     * Returns true if the string ends with a substring
-     */
-    endsWith(str: string | QString): boolean {
-        const suffix = str instanceof QString ? str.toString() : str;
-        return this._data.endsWith(suffix);
-    }
-    
-    /**
-     * Returns a string where all occurrences of before are replaced with after
-     */
-    replace(before: string | RegExp | QString, after: string | QString): QString {
-        const afterStr = after instanceof QString ? after.toString() : after;
-        if (before instanceof QString) {
-            return new QString(this._data.replace(before.toString(), afterStr));
-        }
-        return new QString(this._data.replace(before, afterStr));
-    }
-    
-    /**
-     * Splits the string
-     */
-    split(separator: string | RegExp | QString): QString[] {
-        const sep = separator instanceof QString ? separator.toString() : separator;
-        return this._data.split(sep).map(s => new QString(s));
-    }
-    
-    /**
-     * Appends a string
-     */
-    append(str: string | QString): QString {
-        const appendStr = str instanceof QString ? str.toString() : str;
-        // Return a new QString with the combined value, not just the appended part
-        return new QString(this._data + appendStr);
-    }
-    
-    /**
-     * Returns a string repeated n times
-     */
-    repeated(times: number): QString {
-        return new QString(this._data.repeat(times));
-    }
-    
-    /**
-     * Returns true if the string contains a substring
-     */
-    contains(str: string | QString): boolean {
-        const searchStr = str instanceof QString ? str.toString() : str;
-        return this._data.includes(searchStr);
-    }
-    
-    /**
-     * Converts the QString to a JavaScript string
-     */
-    toString(): string {
-        return this._data;
-    }
-    
-    /**
-     * Converts the QString to a number
-     */
-    toNumber(): number {
-        return parseFloat(this._data);
-    }
-    
-    /**
-     * Converts the QString to an integer
-     */
-    toInt(): number {
-        const result = parseInt(this._data, 10);
-        // Return 0 for NaN results, as Qt does
-        return isNaN(result) ? 0 : result;
-    }
-    
-    /**
-     * Compares this QString with another
-     */
-    compare(other: string | QString): number {
-        const otherStr = other instanceof QString ? other.toString() : other;
-        if (this._data < otherStr) return -1;
-        if (this._data > otherStr) return 1;
-        return 0;
-    }
-    
-    /**
-     * Creates a QString from a number
-     */
-    static number(num: number): QString {
-        return new QString(num.toString());
-    }
-    
-    /**
-     * Returns an empty QString
-     */
-    static empty(): QString {
-        return new QString('');
-    }
-    
-    /**
-     * Joins an array of QStrings with a separator
-     */
-    static join(separator: string | QString, strings: (string | QString)[]): QString {
-        const sep = separator instanceof QString ? separator.toString() : separator;
-        const mapped = strings.map(s => s instanceof QString ? s.toString() : s);
-        return new QString(mapped.join(sep));
-    }
+  private _value: string;
+  
+  constructor(value: string | number | boolean = '') {
+    this._value = String(value);
+  }
+  
+  /**
+   * Returns the string value
+   */
+  toString(): string {
+    return this._value;
+  }
+  
+  /**
+   * Returns the length of the string
+   */
+  length(): number {
+    return this._value.length;
+  }
+  
+  /**
+   * Returns true if the string is empty
+   */
+  isEmpty(): boolean {
+    return this._value.length === 0;
+  }
+  
+  /**
+   * Returns the character at the specified index
+   */
+  charAt(index: number): string {
+    return this._value.charAt(index);
+  }
+  
+  /**
+   * Returns the Unicode code point at the specified index
+   */
+  charCodeAt(index: number): number {
+    return this._value.charCodeAt(index);
+  }
+  
+  /**
+   * Returns a substring
+   */
+  substring(start: number, end?: number): QString {
+    return new QString(this._value.substring(start, end));
+  }
+  
+  /**
+   * Returns a substring
+   */
+  substr(start: number, length?: number): QString {
+    return new QString(this._value.substr(start, length));
+  }
+  
+  /**
+   * Returns the index of the first occurrence of the specified value
+   */
+  indexOf(searchValue: string, fromIndex?: number): number {
+    return this._value.indexOf(searchValue, fromIndex);
+  }
+  
+  /**
+   * Returns the index of the last occurrence of the specified value
+   */
+  lastIndexOf(searchValue: string, fromIndex?: number): number {
+    return this._value.lastIndexOf(searchValue, fromIndex);
+  }
+  
+  /**
+   * Returns a new string with all matches of a pattern replaced
+   */
+  replace(searchValue: string | RegExp, replaceValue: string): QString {
+    return new QString(this._value.replace(searchValue, replaceValue));
+  }
+  
+  /**
+   * Splits the string into an array of substrings
+   */
+  split(separator: string | RegExp, limit?: number): QString[] {
+    return this._value.split(separator, limit).map(s => new QString(s));
+  }
+  
+  /**
+   * Returns a new string with whitespace trimmed from both ends
+   */
+  trim(): QString {
+    return new QString(this._value.trim());
+  }
+  
+  /**
+   * Returns a new string with whitespace trimmed from the start
+   */
+  trimStart(): QString {
+    return new QString(this._value.trimStart());
+  }
+  
+  /**
+   * Returns a new string with whitespace trimmed from the end
+   */
+  trimEnd(): QString {
+    return new QString(this._value.trimEnd());
+  }
+  
+  /**
+   * Converts the string to uppercase
+   */
+  toUpperCase(): QString {
+    return new QString(this._value.toUpperCase());
+  }
+  
+  /**
+   * Converts the string to lowercase
+   */
+  toLowerCase(): QString {
+    return new QString(this._value.toLowerCase());
+  }
+  
+  /**
+   * Checks if the string starts with the specified value
+   */
+  startsWith(searchString: string, position?: number): boolean {
+    return this._value.startsWith(searchString, position);
+  }
+  
+  /**
+   * Checks if the string ends with the specified value
+   */
+  endsWith(searchString: string, position?: number): boolean {
+    return this._value.endsWith(searchString, position || this._value.length);
+  }
+  
+  /**
+   * Returns a new string padded to the specified length
+   */
+  padStart(targetLength: number, padString?: string): QString {
+    return new QString(this._value.padStart(targetLength, padString));
+  }
+  
+  /**
+   * Returns a new string padded to the specified length
+   */
+  padEnd(targetLength: number, padString?: string): QString {
+    return new QString(this._value.padEnd(targetLength, padString));
+  }
 }
 
 // Add debugOutput method to QString

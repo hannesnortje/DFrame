@@ -1,199 +1,244 @@
+import { QObject } from '../core/QObject';
+import { QWidget } from '../core/QWidget';
+import { QMap } from '../core/containers/QMap';
+import { QVariant } from '../core/containers/QVariant';
 import { QFont } from './QFont';
 
-/**
- * QStyle defines the styling capabilities for DFrame components.
- * It provides a consistent way to apply visual properties across the framework.
- */
-export class QStyle {
-  private properties: Map<string, any> = new Map();
+export enum QPalette {
+  Window,
+  WindowText,
+  Base,
+  Text,
+  Button,
+  ButtonText,
+  Highlight,
+  HighlightedText
+}
 
-  /**
-   * Creates a new style instance
-   * @param styleProps Optional initial style properties
-   */
-  constructor(styleProps?: Record<string, any>) {
-    if (styleProps) {
-      Object.entries(styleProps).forEach(([key, value]) => {
-        this.set(key, value);
-      });
+export interface StyleProperties {
+  [key: string]: any;
+}
+
+export class QStyle extends QObject {
+  protected static _instance: QStyle | null = null;  // Changed to protected
+  protected _internalProperties: StyleProperties = {};
+  protected _styleSheet: string = '';
+  protected _styleElement: HTMLStyleElement | null = null;  // Changed to protected
+
+  constructor() {  // Changed to public
+    super(null);
+    this._properties = new QMap<string, QVariant>();
+    this.initializeStyles();
+    this.initializeStyleElement();
+  }
+
+  static instance(): QStyle {
+    if (!QStyle._instance) {
+      QStyle._instance = new QStyle();
+    }
+    return QStyle._instance;
+  }
+
+  protected initializeStyles(): void {
+    this._styleSheet = this.getBaseStyles();
+    this.updateStyleSheet();
+  }
+
+  protected getBaseStyles(): string {
+    const defaultFont = QFont.defaultFont();
+    
+    return `
+      .qwidget {
+        position: absolute !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: auto !important;
+        ${defaultFont.toCss()} !important;
+        min-width: 10px !important;
+        min-height: 10px !important;
+        background: var(--widget-background, white) !important;
+        color: var(--widget-text, black) !important;
+        border: var(--widget-border, none) !important;
+        pointer-events: auto !important;
+        user-select: none !important;
+        transform-style: preserve-3d !important;
+        backface-visibility: hidden !important;
+        will-change: transform, opacity !important;
+        box-sizing: border-box !important;
+      }
+
+      .QPushButton {
+        display: inline-block !important;
+        min-width: 80px !important;
+        text-align: center !important;
+        background: var(--button-background, #f5f5f5) !important;
+        border: 1px solid var(--button-border, #ddd) !important;
+        border-radius: var(--button-radius, 4px) !important;
+        color: var(--button-text, #333) !important;
+        padding: 8px 16px !important;
+        cursor: pointer !important;
+      }
+
+      .QPushButton:hover {
+        background: var(--button-hover-background, #e5e5e5) !important;
+      }
+
+      .QPushButton:disabled {
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+      }
+
+      .QLabel {
+        display: block !important;
+        min-height: 20px !important;
+        color: var(--label-text, inherit) !important;
+      }
+
+      .qhboxlayout {
+        flex-direction: row !important;
+        gap: 8px !important;
+        align-items: center !important;
+      }
+
+      .qvboxlayout {
+        flex-direction: column !important;
+        gap: 8px !important;
+      }
+
+      .qwidget[data-layout] {
+        display: flex !important;
+        flex-direction: column !important;
+      }
+
+      .QPushButton {
+        display: inline-block !important;
+        min-width: 80px !important;
+        text-align: center !important;
+      }
+
+      .QPushButton button {
+        all: unset;
+        display: inline-block !important;
+        padding: 8px 16px !important;
+        background: #f5f5f5 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        font-family: system-ui !important;
+        font-size: 14px !important;
+        color: #333 !important;
+        text-align: center !important;
+        min-width: 80px !important;
+        margin: 4px !important;
+      }
+
+      .QPushButton button:hover {
+        background: #e5e5e5 !important;
+      }
+
+      .QLabel {
+        display: block !important;
+        min-height: 20px !important;
+      }
+    `;
+  }
+
+  clone(): QStyle {
+    const style = new QStyle();
+    style._styleSheet = this._styleSheet;
+    style._internalProperties = { ...this._internalProperties };
+    style._properties = new QMap(this._properties.entries());
+    return style;
+  }
+
+  set(key: string, value: any): void {
+    this._internalProperties[key] = value;
+    this._properties.insert(key, new QVariant(value));
+    this.updateStyleSheet();
+  }
+
+  get(key: string, defaultValue?: any): any {
+    const prop = this._properties.value(key);
+    return prop ? prop.value() : defaultValue;
+  }
+
+  merge(other: QStyle): QStyle {
+    const merged = this.clone();
+    other._properties.forEach((value, key) => {
+      merged._properties.insert(key, value);
+    });
+    merged._internalProperties = {
+      ...merged._internalProperties,
+      ...other._internalProperties
+    };
+    merged.updateStyleSheet();
+    return merged;
+  }
+
+  protected updateStyleSheet(): void {
+    const customProperties = Object.entries(this._internalProperties)
+      .map(([key, value]) => `  --${key}: ${value};`)
+      .join('\n');
+
+    this._styleSheet = `
+      ${this.getBaseStyles()}
+      ${customProperties ? `:root {\n${customProperties}\n}` : ''}
+    `;
+  }
+
+  styleSheet(): string {
+    return this._styleSheet;
+  }
+
+  applyToWidget(widget: QWidget): void {
+    widget.updateStyleFromApplication(this._styleSheet);
+  }
+
+  private initializeStyleElement(): void {
+    if (typeof document !== 'undefined') {
+      this._styleElement = document.getElementById('qstyle-default') as HTMLStyleElement;
+      if (!this._styleElement) {
+        this._styleElement = QStyle.createStyleSheet();
+      }
+      this._styleElement.textContent = this.styleSheet();
     }
   }
 
-  /**
-   * Sets a style property
-   * @param property The property name to set
-   * @param value The value to assign
-   * @returns The QStyle instance for chaining
-   */
-  set(property: string, value: any): QStyle {
-    this.properties.set(property, value);
-    return this;
+  static createStyleSheet(): HTMLStyleElement {
+    const style = document.createElement('style');
+    style.id = 'qstyle-default';
+    document.head.appendChild(style);
+    return style;
   }
 
-  /**
-   * Gets a style property value
-   * @param property The property to retrieve
-   * @param defaultValue Optional default value if property isn't set
-   * @returns The property value or default value
-   */
-  get(property: string, defaultValue?: any): any {
-    return this.properties.has(property) ? this.properties.get(property) : defaultValue;
+  static createDefault(): QStyle {
+    return this.instance();
   }
 
-  /**
-   * Checks if a property is defined in this style
-   * @param property The property to check
-   * @returns True if the property is defined
-   */
-  has(property: string): boolean {
-    return this.properties.has(property);
+  standardFont(role: string = 'default'): QFont {
+    const fontVariant = this._properties.value(`font-${role}`);
+    if (!fontVariant) {
+      return QFont.defaultFont();
+    }
+    return fontVariant.value() as QFont;
   }
 
-  /**
-   * Merges another style into this one
-   * @param style The style to merge
-   * @param override Whether to override existing properties
-   * @returns The QStyle instance for chaining
-   */
-  merge(style: QStyle, override = true): QStyle {
-    style.properties.forEach((value, key) => {
-      if (override || !this.has(key)) {
-        this.set(key, value);
-      }
-    });
-    return this;
+  setStandardFont(font: QFont, role: string = 'default'): void {
+    this._properties.insert(`font-${role}`, new QVariant(font));
+    this.updateStyleSheet();
   }
 
-  /**
-   * Creates a new style by cloning this style
-   * @returns A new QStyle instance with the same properties
-   */
-  clone(): QStyle {
-    const newStyle = new QStyle();
-    this.properties.forEach((value, key) => {
-      newStyle.set(key, value);
-    });
-    return newStyle;
+  standardPalette(role: QPalette): string {
+    const colorVariant = this._properties.value(`color-${QPalette[role]}`);
+    return colorVariant ? colorVariant.value() as string : '#000000';
   }
 
-  /**
-   * Sets a font for this style
-   * @param font The font to use
-   * @returns The QStyle instance for chaining
-   */
-  setFont(font: QFont): QStyle {
-    // Store the font object itself for reference
-    this.set('font', font);
-    
-    // Extract CSS properties from font and set them individually
-    const fontProps = font.toCssProperties();
-    Object.entries(fontProps).forEach(([key, value]) => {
-      this.set(key, value);
-    });
-    
-    return this;
-  }
-
-  /**
-   * Gets the font object if one was explicitly set
-   * @returns The font object or undefined if not set
-   */
-  getFont(): QFont | undefined {
-    return this.get('font');
-  }
-
-  /**
-   * Creates a font object from the current style properties
-   * @returns A QFont instance based on current style properties
-   */
-  createFontFromProperties(): QFont {
-    const font = new QFont({
-      family: this.get('font-family') || this.get('fontFamily'),
-      size: parseFloat(String(this.get('font-size') || this.get('fontSize') || 14)),
-      weight: this.get('font-weight') || this.get('fontWeight'),
-      style: this.get('font-style') || this.get('fontStyle'),
-      decoration: this.get('text-decoration') || this.get('textDecoration'),
-      stretch: this.get('font-stretch') || this.get('fontStretch'),
-      letterSpacing: this.get('letter-spacing') || this.get('letterSpacing'),
-      lineHeight: this.get('line-height') || this.get('lineHeight'),
-    });
-    
-    return font;
-  }
-
-  /**
-   * Helper method for setting consistent padding
-   * @param top Top padding in pixels
-   * @param right Right padding in pixels
-   * @param bottom Bottom padding in pixels
-   * @param left Left padding in pixels
-   * @returns The QStyle instance for chaining
-   */
-  setPadding(top: number, right: number, bottom: number, left: number): QStyle {
-    this.set('padding', `${top}px ${right}px ${bottom}px ${left}px`);
-    return this;
-  }
-
-  /**
-   * Helper method for setting padding uniformly on all sides
-   * @param padding Padding in pixels
-   * @returns The QStyle instance for chaining
-   */
-  setPaddingUniform(padding: number): QStyle {
-    this.set('padding', `${padding}px`);
-    return this;
-  }
-
-  /**
-   * Helper method for setting consistent margins
-   * @param top Top margin in pixels
-   * @param right Right margin in pixels
-   * @param bottom Bottom margin in pixels
-   * @param left Left margin in pixels
-   * @returns The QStyle instance for chaining
-   */
-  setMargin(top: number, right: number, bottom: number, left: number): QStyle {
-    this.set('margin', `${top}px ${right}px ${bottom}px ${left}px`);
-    return this;
-  }
-
-  /**
-   * Helper method for setting margin uniformly on all sides
-   * @param margin Margin in pixels
-   * @returns The QStyle instance for chaining
-   */
-  setMarginUniform(margin: number): QStyle {
-    this.set('margin', `${margin}px`);
-    return this;
-  }
-
-  /**
-   * Helper method for setting border
-   * @param width Border width in pixels
-   * @param style Border style (solid, dashed, etc.)
-   * @param color Border color
-   * @returns The QStyle instance for chaining
-   */
-  setBorder(width: number, style: string, color: string): QStyle {
-    this.set('border', `${width}px ${style} ${color}`);
-    return this;
-  }
-
-  /**
-   * Helper method for setting border radius
-   * @param radius Border radius in pixels
-   * @returns The QStyle instance for chaining
-   */
-  setBorderRadius(radius: number): QStyle {
-    this.set('borderRadius', `${radius}px`);
-    return this;
-  }
-
-  /**
-   * Returns the internal property map
-   * Used by QWidget to efficiently apply all properties
-   */
-  getPropertyMap(): Map<string, any> {
-    return this.properties;
+  setStandardPalette(color: string, role: QPalette): void {
+    this._properties.insert(`color-${QPalette[role]}`, new QVariant(color));
+    this.updateStyleSheet();
   }
 }
+
+// Export a singleton instance
+export const defaultStyle = QStyle.createDefault();

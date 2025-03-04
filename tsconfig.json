@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
-    "lib": ["dom", "es6", "es2017"],
-    "jsx": "react",
+    "target": "es2019",
+    "module": "esnext",
+    "lib": ["dom", "dom.iterable", "es2019"],
+    "jsx": "react-jsx",
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
@@ -11,8 +11,24 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
+    "types": ["node", "jest", "@testing-library/jest-dom"],
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "isolatedModules": false,  // Changed this to false
+    "noEmit": false,  // Changed this to false
+    "sourceMap": true,
+    "baseUrl": "src",
+    "paths": {
+      "*": ["*", "types/*"]
+    }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/__tests__/*"]
+  "include": ["src"],
+  "exclude": ["node_modules", "**/__tests__/*", "dist"]
 }

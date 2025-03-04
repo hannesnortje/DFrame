@@ -1,61 +1,77 @@
-import { QTheme, QStyle, globalTheme } from './index';
-import { QObject } from '../core/QObject';
+import { QStyle } from './QStyle';
+import { QTheme, globalTheme } from './QTheme';
 import { QWidget } from '../core/QWidget';
+import { QObject } from '../core/QObject';
 
 /**
- * QThemeManager provides a way to manage multiple themes
- * and switch between them.
+ * Theme definition interface
+ */
+export interface ThemeDefinition {
+  name: string;
+  baseColors: {
+    backgroundColor: string;
+    color: string;
+    borderColor: string;
+    shadowColor: string;
+    fontFamily: string;
+  };
+}
+
+/**
+ * Manages themes and applies them to widgets
  */
 export class QThemeManager extends QObject {
-  private themes: Map<string, QTheme> = new Map();
-  private currentTheme: string | null = null;
+  private _themes: Map<string, QTheme> = new Map();
+  private _currentTheme: string = 'default';
   
-  /**
-   * Creates a new theme manager
-   */
   constructor() {
     super();
+    // Register the global theme as the default theme
+    this._themes.set('default', globalTheme);
   }
   
   /**
-   * Registers a theme with the manager
-   * @param name The name to identify the theme
-   * @param theme The theme instance
+   * Registers a new theme
+   * @param name Theme name
+   * @param theme Theme object
    */
-  registerTheme(name: string, theme: QTheme): QThemeManager {
-    this.themes.set(name, theme);
-    return this;
+  registerTheme(name: string, theme: QTheme): void {
+    this._themes.set(name, theme);
   }
   
   /**
-   * Gets a registered theme by name
-   * @param name The theme name
-   * @returns The theme instance or undefined if not found
+   * Gets a theme by name
+   * @param name Theme name
    */
   getTheme(name: string): QTheme | undefined {
-    return this.themes.get(name);
+    return this._themes.get(name);
   }
   
   /**
-   * Sets the active theme and applies it
-   * @param name Name of the theme to activate
-   * @returns True if theme was found and applied, false otherwise
+   * Sets the current theme
+   * @param name Theme name
    */
-  setTheme(name: string): boolean {
-    const theme = this.themes.get(name);
-    if (!theme) {
+  setCurrentTheme(name: string): boolean {
+    if (!this._themes.has(name)) {
+      console.error(`Theme "${name}" is not registered`);
       return false;
     }
     
-    // Apply theme to global theme
-    this.applyTheme(theme);
-    this.currentTheme = name;
+    this._currentTheme = name;
+    
+    // Update global theme with the new theme
+    const theme = this._themes.get(name);
+    if (theme) {
+      this.applyTheme(theme);
+    }
     
     // Emit signal
     this.emit('themeChanged', name);
     
     // Notify all widgets to update their styles
-    QWidget.notifyAllWidgetsOfThemeChange();
+    if (typeof QWidget.notifyAllWidgetsOfThemeChange === 'function') {
+      QWidget.notifyAllWidgetsOfThemeChange(name); // Fixed: Added the name parameterefault'); // Provide a theme ID
+    }
     
     return true;
   }
@@ -65,7 +81,7 @@ export class QThemeManager extends QObject {
    * @returns The active theme name, or null if none is set
    */
   getCurrentTheme(): string | null {
-    return this.currentTheme;
+    return this._currentTheme;
   }
   
   /**
@@ -73,58 +89,60 @@ export class QThemeManager extends QObject {
    */
   setupDefaultThemes(): QThemeManager {
     // Create light theme
-    const lightTheme = new QTheme({
-      backgroundColor: '#ffffff',
-      color: '#333333',
-      borderColor: '#dddddd',
-      shadowColor: 'rgba(0,0,0,0.1)',
-      fontFamily: 'Arial, sans-serif'
-    });
+    const lightTheme = new QTheme('light');
+    const lightBaseStyle = new QStyle();
+    lightBaseStyle.set('background-color', '#ffffff');
+    lightBaseStyle.set('color', '#333333');
+    lightBaseStyle.set('border-color', '#dddddd');
+    lightBaseStyle.set('shadow-color', 'rgba(0,0,0,0.1)');
+    lightBaseStyle.set('font-family', 'Arial, sans-serif');
+    lightTheme.setDefaultStyle(lightBaseStyle);
     
     // Add light theme component styles
-    lightTheme.registerStyle('Button', new QStyle({
-      backgroundColor: '#4285f4',
-      color: 'white',
-      borderRadius: '4px',
-      padding: '8px 16px',
-      hoverBackgroundColor: '#2b7de9'
-    }));
+    const lightButtonStyle = new QStyle();
+    lightButtonStyle.set('background-color', '#4285f4');
+    lightButtonStyle.set('color', 'white');
+    lightButtonStyle.set('border-radius', '4px');
+    lightButtonStyle.set('padding', '8px 16px');
+    lightButtonStyle.set('hover-background-color', '#2b7de9');
+    lightTheme.registerStyle('Button', lightButtonStyle);
     
-    lightTheme.registerStyle('Input', new QStyle({
-      backgroundColor: 'white',
-      borderColor: '#cccccc',
-      color: '#333333',
-      borderRadius: '4px',
-      padding: '8px',
-      focusBorderColor: '#4285f4'
-    }));
+    const lightInputStyle = new QStyle();
+    lightInputStyle.set('background-color', 'white');
+    lightInputStyle.set('border-color', '#cccccc');
+    lightInputStyle.set('color', '#333333');
+    lightInputStyle.set('border-radius', '4px');
+    lightInputStyle.set('padding', '8px');
+    lightInputStyle.set('focus-border-color', '#4285f4');
+    lightTheme.registerStyle('Input', lightInputStyle);
     
     // Create dark theme
-    const darkTheme = new QTheme({
-      backgroundColor: '#222222',
-      color: '#eeeeee',
-      borderColor: '#444444',
-      shadowColor: 'rgba(0,0,0,0.4)',
-      fontFamily: 'Arial, sans-serif'
-    });
+    const darkTheme = new QTheme('dark');
+    const darkBaseStyle = new QStyle();
+    darkBaseStyle.set('background-color', '#222222');
+    darkBaseStyle.set('color', '#eeeeee');
+    darkBaseStyle.set('border-color', '#444444');
+    darkBaseStyle.set('shadow-color', 'rgba(0,0,0,0.4)');
+    darkBaseStyle.set('font-family', 'Arial, sans-serif');
+    darkTheme.setDefaultStyle(darkBaseStyle);
     
     // Add dark theme component styles
-    darkTheme.registerStyle('Button', new QStyle({
-      backgroundColor: '#3367d6',
-      color: 'white',
-      borderRadius: '4px',
-      padding: '8px 16px',
-      hoverBackgroundColor: '#4285f4'
-    }));
+    const darkButtonStyle = new QStyle();
+    darkButtonStyle.set('background-color', '#3367d6');
+    darkButtonStyle.set('color', 'white');
+    darkButtonStyle.set('border-radius', '4px');
+    darkButtonStyle.set('padding', '8px 16px');
+    darkButtonStyle.set('hover-background-color', '#4285f4');
+    darkTheme.registerStyle('Button', darkButtonStyle);
     
-    darkTheme.registerStyle('Input', new QStyle({
-      backgroundColor: '#333333',
-      borderColor: '#555555',
-      color: '#eeeeee',
-      borderRadius: '4px',
-      padding: '8px',
-      focusBorderColor: '#4285f4'
-    }));
+    const darkInputStyle = new QStyle();
+    darkInputStyle.set('background-color', '#333333');
+    darkInputStyle.set('border-color', '#555555');
+    darkInputStyle.set('color', '#eeeeee');
+    darkInputStyle.set('border-radius', '4px');
+    darkInputStyle.set('padding', '8px');
+    darkInputStyle.set('focus-border-color', '#4285f4');
+    darkTheme.registerStyle('Input', darkInputStyle);
     
     // Register themes
     this.registerTheme('light', lightTheme);
@@ -142,11 +160,11 @@ export class QThemeManager extends QObject {
     const themeName = prefersDark ? 'dark' : 'light';
     
     // Ensure we have light/dark themes
-    if (!this.themes.has(themeName)) {
+    if (!this._themes.has(themeName)) {
       this.setupDefaultThemes();
     }
     
-    this.setTheme(themeName);
+    this.setCurrentTheme(themeName);
     return themeName;
   }
   
@@ -157,7 +175,7 @@ export class QThemeManager extends QObject {
     window.matchMedia('(prefers-color-scheme: dark)')
       .addEventListener('change', e => {
         const themeName = e.matches ? 'dark' : 'light';
-        this.setTheme(themeName);
+        this.setCurrentTheme(themeName);
       });
   }
   
@@ -167,17 +185,21 @@ export class QThemeManager extends QObject {
    * @private
    */
   private applyTheme(theme: QTheme): void {
-    // First set the default style
-    globalTheme.setDefaultStyle(theme.getStyle(''));
+    // Get the default style and set it if available
+    const defaultStyle = theme.getStyle('');
+    if (defaultStyle) {
+      globalTheme.setDefaultStyle(defaultStyle);
+    }
     
     // Then register all component styles
-    // This assumes we can get a list of registered style names from QTheme
-    // If this isn't available in the API, we'd need to modify QTheme
     const componentTypes = this.getComponentTypes(theme);
     
     for (const componentType of componentTypes) {
       if (componentType) { // Skip the default style
-        globalTheme.registerStyle(componentType, theme.getStyle(componentType));
+        const componentStyle = theme.getStyle(componentType);
+        if (componentStyle) {
+          globalTheme.registerStyle(componentType, componentStyle);
+        }
       }
     }
   }
@@ -197,6 +219,7 @@ export class QThemeManager extends QObject {
     
     // For now, we'll return a default set of common component types
     return [
+      '', // Default style
       'Button', 
       'Input', 
       'Label', 
@@ -206,7 +229,9 @@ export class QThemeManager extends QObject {
       'Menu', 
       'Tab',
       'Table',
-      'TextField'
+      'TextField',
+      'QPushButton',
+      'QLabel'
     ];
   }
 }

@@ -1,11 +1,3 @@
-export * from './core/index';
-export {
-    QBoxLayout,
-    Direction,
-    LayoutOptions
-} from './layouts';
-export {
-    QPushButton,
-    WidgetOptions
-} from './widgets';
-export { VERSION, VersionInfo } from './version';
+export { QObject, QWidget, QApplication } from './core';
+export { QPushButton, QLabel } from './widgets';
+export { QVBoxLayout, QHBoxLayout, QGridLayout } from './layouts';

@@ -1,173 +1,134 @@
 import { QObject } from './QObject';
-import { QEvent, EventType } from './QEvent';
-import { QTimer } from './QTimer';
+import { QEvent, QEventType } from './QEvent';
 
 /**
- * Core application class without GUI support
+ * Core application class that manages the event loop
  */
 export class QCoreApplication extends QObject {
   protected static _instance: QCoreApplication | null = null;
-  private _argc: number;
-  private _argv: string[];
-  private _applicationName: string = '';
-  private _organizationName: string = '';
-  private _organizationDomain: string = '';
-  private _eventLoop: boolean = false;
-  private _eventQueue: any[] = [];
-  private _exitCode: number = 0;
-  
+  protected _args: string[];
+  protected _eventQueue: { target: QObject; event: QEvent }[] = [];
+  protected _running = false;
+  protected _exitCode = 0;
+
   /**
    * Creates a new QCoreApplication
    */
   constructor(args: string[] = []) {
     super(null);
-    this._argc = args.length;
-    this._argv = args;
+    this._args = args;
     
+    // Single instance management
     if (QCoreApplication._instance) {
-      // For testing we'll replace the instance rather than throw
-      // This allows multiple app instances during tests
-      console.warn('QCoreApplication is already instantiated, replacing instance for tests');
+      console.warn('QCoreApplication is already instantiated');
+      return QCoreApplication._instance;
     }
     
     QCoreApplication._instance = this;
+    this._running = false; // Initialize as not running
   }
-  
+
   /**
    * Returns the QCoreApplication instance
    */
   static instance(): QCoreApplication {
-    return QCoreApplication._instance!;
+    if (!QCoreApplication._instance) {
+      throw new Error('QCoreApplication is not instantiated');
+    }
+    return QCoreApplication._instance;
   }
-  
+
   /**
-   * Sets the application name
+   * Override postEvent to match QObject's signature 
+   * with compatibility for both calling patterns
    */
-  setApplicationName(name: string): void {
-    this._applicationName = name;
+  postEvent(event: QEvent): void;
+  postEvent(receiver: QObject, event: QEvent): void;
+  postEvent(arg1: QObject | QEvent, arg2?: QEvent): void {
+    if (arg1 instanceof QEvent) {
+      // Single arg version - post to self
+      this._eventQueue.push({ target: this, event: arg1 });
+    } else if (arg1 instanceof QObject && arg2 instanceof QEvent) {
+      // Two arg version - post to another object
+      this._eventQueue.push({ target: arg1, event: arg2 });
+    }
   }
-  
+
   /**
-   * Returns the application name
+   * Sends an event immediately to the target
    */
-  applicationName(): string {
-    return this._applicationName;
+  sendEventObject(target: QObject, event: QEvent): boolean {
+    return target.event(event);
   }
-  
+
   /**
-   * Sets the organization name
-   */
-  setOrganizationName(name: string): void {
-    this._organizationName = name;
-  }
-  
-  /**
-   * Returns the organization name
-   */
-  organizationName(): string {
-    return this._organizationName;
-  }
-  
-  /**
-   * Sets the organization domain
-   */
-  setOrganizationDomain(domain: string): void {
-    this._organizationDomain = domain;
-  }
-  
-  /**
-   * Returns the organization domain
-   */
-  organizationDomain(): string {
-    return this._organizationDomain;
-  }
-  
-  /**
-   * Posts an event to be processed later in the event loop
-   * @param receiver The object to receive the event
-   * @param event The event to post
-   */
-  postEventObject(receiver: QObject, event: any): void {
-    this._eventQueue.push({
-      receiver,
-      event
-    });
-  }
-  
-  /**
-   * Sends an event directly to the receiver immediately
-   * @param receiver The object to receive the event
-   * @param event The event to send
-   */
-  sendEventObject(receiver: QObject, event: any): boolean {
-    return receiver.event(event);
-  }
-  
-  /**
-   * Processes events in the event queue
+   * Process events in the event queue
    */
   processEvents(): void {
     const queue = [...this._eventQueue];
     this._eventQueue = [];
     
-    for (const item of queue) {
-      item.receiver.event(item.event);
+    for (const { target, event } of queue) {
+      target.event(event);
     }
   }
-  
+
   /**
    * Executes the application's main event loop
    */
   exec(): number {
-    this._eventLoop = true;
+    if (this._running) {
+      console.log('Application is already running');
+      return this._exitCode;
+    }
+
+    this._running = true;
+    console.log('Starting event loop');
     
-    while (this._eventLoop) {
-      this.processEvents();
+    // If we're in a browser environment, set up the animation frame loop
+    if (typeof window !== 'undefined') {
+      const processEventsRecursive = () => {
+        if (this._running) {
+          this.processEvents();
+          requestAnimationFrame(processEventsRecursive);
+        }
+      };
       
-      // In a real implementation, would wait for events or yield here
-      // This is a simplified version that would need to be adjusted
-      // for real-world use
-      if (this._eventQueue.length === 0) {
-        this._eventLoop = false;
-      }
+      requestAnimationFrame(processEventsRecursive);
+    } else {
+      // For Node.js or testing environments, process events once
+      this.processEvents();
     }
     
     return this._exitCode;
   }
-  
+
   /**
-   * Tells the application to exit with the given return code
+   * Exit the application
    */
-  exit(returnCode: number = 0): void {
-    this._eventLoop = false;
-    this._exitCode = returnCode;
+  quit(exitCode: number = 0): void {
+    this._running = false;
+    this._exitCode = exitCode;
   }
 
   /**
-   * Quit the application
+   * Returns the command line arguments
    */
-  quit(returnCode: number = 0): void {
-    this.exit(returnCode);
-    QCoreApplication._instance = null;
+  arguments(): string[] {
+    return [...this._args];
   }
-  
+
   /**
-   * Static method to quit the application
+   * Returns whether the application is still running
    */
-  static quit(returnCode: number = 0): void {
-    if (QCoreApplication._instance) {
-      QCoreApplication._instance.quit(returnCode);
-    }
+  isRunning(): boolean {
+    return this._running;
   }
-  
+
   /**
-   * Static method to get the application's directory path
+   * Returns the exit code
    */
-  static applicationDirPath(): string {
-    // In a web context, return the location origin
-    if (typeof window !== 'undefined' && window.location) {
-      return window.location.origin;
-    }
-    return '';
+  exitCode(): number {
+    return this._exitCode;
   }
 }

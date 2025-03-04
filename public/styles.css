@@ -1,9 +1,112 @@
-body {
+/* Reset */
+* {
+    box-sizing: border-box;
     margin: 0;
-    padding: 20px;
+    padding: 0;
+}
+
+/* Core styles */
+html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: fixed;
+    margin: 0;
+    padding: 0;
+    background: #f0f0f0;
+}
+
+body {
     font-family: system-ui, -apple-system, sans-serif;
 }
 
-#root {
-    min-height: 100vh;
+/* Root container */
+#qapp-root {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: visible !important;
+    background: #f0f0f0 !important;
+    z-index: 1 !important;
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Widget base styles */
+.qwidget {
+    position: absolute !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: auto !important;
+    min-width: 10px !important;
+    min-height: 10px !important;
+    background: white !important;
+    pointer-events: auto !important;
+    user-select: none !important;
+    transform-style: preserve-3d !important;
+    backface-visibility: hidden !important;
+    will-change: transform, opacity !important;
+    border: 1px dashed rgba(0,0,0,0.1) !important;
+}
+
+/* Button styles */
+.qwidget button {
+    all: unset;
+    display: inline-block !important;
+    padding: 8px 16px !important;
+    background: #f5f5f5 !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-family: system-ui !important;
+    font-size: 14px !important;
+    color: #333 !important;
+    text-align: center !important;
+    min-width: 80px !important;
+    margin: 4px !important;
+}
+
+.qwidget button:hover {
+    background: #e5e5e5 !important;
+}
+
+/* Debug styles */
+.qwidget[data-debug] {
+    background: rgba(0,0,0,0.05) !important;
+}
+
+.qwidget[data-debug]:hover {
+    outline: 2px solid rgba(0,0,255,0.2) !important;
+}
+
+/* Layout styles */
+.qwidget[data-layout] {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.qhboxlayout {
+    flex-direction: row !important;
+    gap: 8px !important;
+    align-items: center !important;
+}
+
+.qvboxlayout {
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+/* Widget-specific styles */
+.qwidget.QPushButton {
+    display: inline-block !important;
+    min-width: 80px !important;
+    text-align: center !important;
+}
+
+.qwidget.QLabel {
+    display: block !important;
+    min-height: 20px !important;
 }

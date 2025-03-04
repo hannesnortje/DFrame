@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "isolatedModules": false,
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "types": ["node"] // Remove test-related types from build config
+  },
+  "include": ["src"],
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "src/core/QDefaultStyle.ts"
+  ]
+}

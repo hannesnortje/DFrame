@@ -1,219 +1,88 @@
 import { QWidget } from '../core/QWidget';
 import { QString } from '../core/containers/QString';
-import { QList } from '../core/containers/QList';
+import { globalTheme } from '../style/QTheme';
+import { QFont } from '../style/QFont';
 
 /**
- * Text alignment options
- */
-export enum TextAlignment {
-  Left,
-  Center,
-  Right,
-  Justify
-}
-
-/**
- * Text format options
- */
-export enum TextFormat {
-  PlainText,
-  RichText,
-  MarkdownText
-}
-
-/**
- * A label widget for displaying text
+ * A label widget that displays text or an image
  */
 export class QLabel extends QWidget {
-  // Use QList to track format ranges
-  private _formatRanges: QList<{ 
-    start: number; 
-    length: number; 
-    format: string;
-  }> = new QList();
+  private _text: string = '';
+  private _textElement: HTMLElement;
   
-  private _textFormat: TextFormat = TextFormat.PlainText;
-  private _alignment: TextAlignment = TextAlignment.Left;
-  private _wordWrap: boolean = false;
-  
-  // Fix constructor to ensure exactly 3 style properties
-  constructor(text?: string | QString, parent?: QWidget) {
+  /**
+   * Creates a new QLabel instance
+   * @param text Initial text to display
+   * @param parent Optional parent widget
+   */
+  constructor(text: string = '', parent: QWidget | null = null) {
     super(parent);
     
-    // When a QWidget is created, it already has default styling
-    // We need to clear all existing style properties first
-    const currentProperties = this.styleProperties();
-    const keys = currentProperties.keys();
-    for (const key of keys) {
-      this.removeStyleProperty(key);
-    }
+    // Set widget class
+    this.element.classList.add('qlabel');
     
-    // Set exactly these properties to match the test expectation
-    this.setStyleProperty('padding', '4px');
-    this.setStyleProperty('color', '#000');
-    this.setStyleProperty('font-size', '14px');
-    this.setStyleProperty('text-align', 'left'); // Default text alignment
-    this.setStyleProperty('user-select', 'none'); // Include user-select for test
+    // Create text element
+    this._textElement = document.createElement('span');
+    this.element.appendChild(this._textElement);
     
-    if (text) {
-      this.setText(text);
-    }
+    // Set initial text
+    this.setText(text);
     
-    // Update text alignment
-    this.updateTextAlignment();
+    // Apply default styling
+    this.element.style.display = 'flex';
+    this.element.style.alignItems = 'center';
+    this.element.style.justifyContent = 'flex-start';
+    this.element.style.overflow = 'hidden';
+    this.element.style.whiteSpace = 'nowrap';
+    this.element.style.textOverflow = 'ellipsis';
   }
   
   /**
-   * Overrides base updateElement to handle text formatting options
+   * Sets the text to be displayed
    */
-  protected updateElement() {
-    super.updateElement();
-    
-    if (this._textFormat === TextFormat.PlainText) {
-      // Plain text rendering
-      this.element().textContent = this.text().toString();
-    } else {
-      // Rich text or markdown rendering
-      this.renderFormattedText();
-    }
-    
-    // Update word wrap styling
-    this.element().style.whiteSpace = this._wordWrap ? 'normal' : 'nowrap';
-    this.element().style.overflow = 'hidden';
-    this.element().style.textOverflow = 'ellipsis';
+  setText(text: string): void {
+    this._text = text;
+    this._textElement.textContent = text;
+    this.emit('textChanged', text);
   }
   
   /**
-   * Sets the text format
+   * Returns the current text
    */
-  setTextFormat(format: TextFormat): void {
-    if (this._textFormat !== format) {
-      this._textFormat = format;
-      this.updateElement();
-      this.emit('textFormatChanged', format);
-    }
+  text(): string {
+    return this._text;
   }
   
   /**
-   * Returns the current text format
+   * Sets text alignment
+   * @param alignment Alignment (left, center, right)
    */
-  textFormat(): TextFormat {
-    return this._textFormat;
-  }
-  
-  /**
-   * Sets the text alignment
-   */
-  setAlignment(alignment: TextAlignment): void {
-    if (this._alignment !== alignment) {
-      this._alignment = alignment;
-      this.updateTextAlignment();
-      this.emit('alignmentChanged', alignment);
-    }
-  }
-  
-  /**
-   * Updates text alignment CSS properties
-   */
-  private updateTextAlignment(): void {
-    let textAlign = 'left';
-    
-    switch (this._alignment) {
-      case TextAlignment.Left:
-        textAlign = 'left';
+  setAlignment(alignment: string): void {
+    switch (alignment.toLowerCase()) {
+      case 'left':
+        this.element.style.justifyContent = 'flex-start';
         break;
-      case TextAlignment.Center:
-        textAlign = 'center';
+      case 'center':
+        this.element.style.justifyContent = 'center';
         break;
-      case TextAlignment.Right:
-        textAlign = 'right';
-        break;
-      case TextAlignment.Justify:
-        textAlign = 'justify';
+      case 'right':
+        this.element.style.justifyContent = 'flex-end';
         break;
     }
-    
-    this.setStyleProperty('text-align', textAlign);
   }
   
   /**
-   * Returns the current text alignment
-   */
-  alignment(): TextAlignment {
-    return this._alignment;
-  }
-  
-  /**
-   * Renders formatted text with styling
-   */
-  private renderFormattedText(): void {
-    const element = this.element();
-    element.innerHTML = '';
-    
-    const textContent = this.text().toString();
-    
-    if (this._textFormat === TextFormat.RichText) {
-      // For rich text, use innerHTML with sanitization if needed
-      element.innerHTML = textContent;
-    } else if (this._textFormat === TextFormat.MarkdownText) {
-      // Simplified markdown support
-      let html = textContent
-        // Bold
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        // Italics
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        // Links
-        .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
-        
-      element.innerHTML = html;
-    }
-    
-    // Apply any format ranges
-    this._formatRanges.forEach(range => {
-      // Implementation would depend on specific formatting needs
-      // This is a simplified demonstration
-    });
-  }
-  
-  /**
-   * Sets whether text should wrap
+   * Sets whether the text can be wrapped
    */
   setWordWrap(wrap: boolean): void {
-    if (this._wordWrap !== wrap) {
-      this._wordWrap = wrap;
-      this.updateElement();
-      this.emit('wordWrapChanged', wrap);
-    }
+    this.element.style.whiteSpace = wrap ? 'normal' : 'nowrap';
   }
   
   /**
-   * Returns whether word wrap is enabled
+   * Sets the font for the label
    */
-  wordWrap(): boolean {
-    return this._wordWrap;
-  }
-  
-  /**
-   * Sets formatted text from HTML
-   */
-  setHtml(html: string): void {
-    this.setText(html);
-    this.setTextFormat(TextFormat.RichText);
-  }
-  
-  /**
-   * Formats specific parts of the text
-   */
-  addFormatRange(start: number, length: number, format: string): void {
-    this._formatRanges.append({ start, length, format });
-    this.updateElement();
-  }
-  
-  /**
-   * Clears all format ranges
-   */
-  clearFormatRanges(): void {
-    this._formatRanges.clear();
-    this.updateElement();
+  setFont(font: QFont | string): void {
+    super.setFont(font);
+    this._textElement.style.font = typeof font === 'string' ? font : font.toString();
   }
 }
