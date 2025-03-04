@@ -21,15 +21,21 @@ export class Signal<T extends any[] = []> {
   }
 }
 
-export function signal<T extends any[] = []>(target: any, propertyKey: string) {
-  const signalKey = Symbol(`signal_${propertyKey}`);
-  
-  Object.defineProperty(target, propertyKey, {
-    get() {
-      if (!this[signalKey]) {
-        this[signalKey] = new Signal<T>(this);
+// Updated decorator implementation for TypeScript 5
+export function signal<This, T extends Signal<any>>() {
+  return (target: undefined, context: ClassFieldDecoratorContext<This, T>) => {
+    const signalKey = Symbol(`signal_${String(context.name)}`);
+    
+    return function(this: This) {
+      if (!Object.getOwnPropertyDescriptor(this, signalKey)) {
+        Object.defineProperty(this, signalKey, {
+          value: new Signal(this),
+          enumerable: false,
+          configurable: false,
+          writable: false
+        });
       }
-      return this[signalKey];
-    }
-  });
+      return Object.getOwnPropertyDescriptor(this, signalKey)!.value as T;
+    };
+  };
 }
